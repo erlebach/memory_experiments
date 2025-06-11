@@ -3,6 +3,22 @@
 - Human: Gordon Erlebacher
 - Date: 2025-06-10
 
+# Table of Content
+
+1. [Multi-Scale, Always-Learning Memory Design](#episodic_semantic_multiscale_memory_1)
+- [Config Management with OmegaConf and YAML](#omegaconf_yaml)
+- [Evaluating Whether Memory Updates During Inference](#episodic_memory_1)
+- [Wrapper versus Memory Updates, Eval Mode](#episodic_memory_2)
+- [Adaptatiaon speed, capture capacity and fidelity, catastrophic forgetting](#episodic_memory_adaptation_speed_forgetfulness_metrics)
+- [Choosing and Understanding Key/Value Representations](#episodic_memory_properties_of_keys_and_values_embedding)
+- [Role of Embedding Dim and Memory Type](#episodic_memory_dependance_on_embedding_dim_memory_type)
+- [Feeding Token Inputs to Episodic Memory](#episodic_memory_how_to_feed_tokens_to_memory)
+- [Reinterpreting BERT as a Memory System](#episodic_memory_use_of_bert_for_compression)
+- [Effect of Varying Update Steps Per Batch](#episodic_memory_vary_number_of_steps_per_update)
+- [Distinguishing Fact vs Conceptual Storage in Memory](#episodic_memory_facts_versus_abstract_concepts)
+
+
+
 # Are there papers, blogs, tutorials that discuss implementation details of various forms of associative memory using Pytorch? I am interested in the key/value implementation where the loss function is either based on similarity or L2.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -429,6 +445,7 @@ In summary, your mental model is correct and serves as a strong foundation. The 
 ---  
 
 
+<a id="episodic_semantic_multiscale_memory_1"/>
 # My interest is really to develop multi-scale memory modules that are always learning, whether during training or inference, similar to the fast-weight concept of Geoffrey Hinton. I envision different memories with different properties updating at different rates. I am trying to decide on an architecture. I wish to include modern techniques, such as DeltaNet, Omega-Net, Atlas, etc. Regression-based memories (He et al, I believe) or "TTT: training at test time) are also of interest. I want a useful reusable module. Eventually, a chunked implementation would be good, but for now, a non-chunked version is good enough, with a context size no larger than 100. I want to play with small models.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -584,6 +601,7 @@ Given your focus on small models and a context size of ~100, memory usage should
 ---  
 
 
+<a id="omegaconf_yaml"/>
 # The use of OmegaConf and YAML also aligns with Nemo-1 from Nvidia. I have been studying the Nemo-2 architecture for use with H100s at FSU. 
 
 Can you proposal a few experiments to verify that my memories are operating correctly? The various modules should be tested individually in as clean an environment as possible.  
@@ -707,6 +725,7 @@ This is a basic sanity check on the gating mechanism's output.
 ---  
 
 
+<a id="episodic_memory_1"/>
 # Great. Returning to the episodic memory. I don't understand the test you propose for training during inference. You wrote: 
 ```
 Experiment 2: Test-Time Update Validation
@@ -847,6 +866,7 @@ Both are valuable. The state change test is more direct for debugging the `updat
 ---  
 
 
+<a id="episodic_memory_2"/>
 # Still would not work. The episodic memory must be in a larger model which is in eval model. The memory module would not be in eval mode, or else the internal state would not change, unless the state is changed explicitly rather than using a backpropagation on the loss function associated with the memory. If I can use backdrop on a loss function, I can experiment with more memory types. Does that make sense? So the wrapper model is in eval-mode and the model is in train-mode.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -982,6 +1002,7 @@ This revised test now correctly demonstrates that your `EpisodicMemory` module i
 ---  
 
 
+<a id="episodic_memory_adaptation_speed_forgetfulness_metrics"/>
 # Ok. Great. Now, stick with the episodic memory, using the module just developed. I would like to test concepts such as: how fast is the memory adapting to the data used, how fast is it capturing the data, how should I measure forgetfulness, what are the useful metrics, etc.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -1094,6 +1115,7 @@ This is the classic continual learning test. It measures how much learning a new
 ---  
 
 
+<a id="episodic_memory_properties_of_keys_and_values_embedding"/>
 # When performing these tests, what are the properties of the key/value pairs to use? With attention, keys and values derive from the same context `x` via a projection matrix. But that is not an intuitive view of memory since intuition dictates that keys and values are independent quantities. Also, in these experiments, do keys (i.e., a token) have an embedding dimension? Off hand, when I store the number "four" in my own human memory, there is no associated embedding that I know of.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -1182,6 +1204,7 @@ Your question about the number "four" and its embedding is insightful. In your m
 ---  
 
 
+<a id="episodic_memory_dependance_on_embedding_dim_memory_type"/>
 # Ok. So sticking with episodic memory, keeping the memory fixed, the results will depend on the embedding dimension, correct? One can also experiment to find out if there is a relation between the embedding dimension of the tokens fed into the memory and the internal embedding of the memory (which need not be the same). Also, the memory could be a vector or a matrix memory, while still being episodic. So having a robust set of experiments would allow us to examine the properties of the memory.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -1317,6 +1340,7 @@ Human episodic memory is characterized by temporal contiguity: recalling an even
 ---  
 
 
+<a id="episodic_memory_how_to_feed_tokens_to_memory"/>
 # The version of memory that creates its own embedding space is reminiscent of attention modules that do the same. So my question is: in the experiments we are discussing here, am I feeding one token vector at a time to the memory? In a sense, we are working an attention module with a context length of 1.  
   
 # Answer (Gemini 2.5 Pro):  
@@ -1413,6 +1437,7 @@ This approach directly tests the memory's ability to handle complex, information
 ---  
 
 
+<a id="episodic_memory_use_of_bert_for_compression"/>
 # I will have to come back to this. In effect, BERT acts as a nonlinear memory. After all, memory is nothing but a mapping from a sequence to a latent space. All we have done since the early days of VAE (Kingma et al) is concept reinterpretation, leading to new architectures and experiments. 
 
 Regarding the batch dimension. If my batch size is 32, for example, is the memory duplicated 32 times? Or are the 32 tokens passed to the loss function in parallel, the loss functions are added up, followed by back propagation to update the memory weights (actually, this is probably correct.)  
@@ -1489,6 +1514,7 @@ In this code, the gradients from each mini-batch are summed up. The `optimizer.s
 ---  
 
 
+<a id="episodic_memory_vary_number_of_steps_per_update"/>
 # Another experiment when working with inference at test time is to vary the number of steps per batch. More steps indicate, in principle, more accurate memory retrieval, but perhaps some form of overfitting of memory (you could formalize this.)  
   
 # Answer (Gemini 2.5 Pro):  
@@ -1563,6 +1589,7 @@ This single, powerful experiment directly tests your hypothesis and provides a c
 ---  
 
 
+<a id="episodic_memory_facts_versus_abstract_concepts"/>
 # Excellent. Next, could you device a specific experiment to test whether the memory is storing "facts" versus storing "abstract concepts". I have read that when there much more data than capacity, during training, transformer memory starts encoding facts, but that this eventually translates to higher-level abstractions. I don't know whether these concepts make sense for episodic memory. If there are similar notions to consider, let's test for them.  
   
 # Answer (Gemini 2.5 Pro):  
