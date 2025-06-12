@@ -1,8 +1,13 @@
+import einops
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from beartype import beartype
+from einops import einsum
+from jaxtyping import Float, Integer
+from torch import Tensor
 
 
 class TrueEpisodicMemory(nn.Module):
@@ -38,11 +43,23 @@ class TrueEpisodicMemory(nn.Module):
         used_mask = self.used_slots.float()
 
         # Standard content-based attention
-        content_scores = torch.matmul(query, self.mem_keys.T)
+        # content_scores = torch.matmul(query, self.mem_keys.T)
+        content_scores = einsum(
+            query,
+            self.mem_keys,
+            "batch query_dim, memory_size query_dim -> batch memory_size",
+        )
 
         # Add contextual similarity if context provided
         if context is not None:
-            context_scores = torch.matmul(context, self.mem_contexts.T)
+            # context_scores = torch.matmul(context, self.mem_contexts.T)
+            # """
+            context_scores = einsum(
+                context,
+                self.mem_contexts,
+                "batch context_dim, memory_size context_dim -> batch memory_size",
+            )
+            # """
             content_scores = content_scores + 0.5 * context_scores
 
         # Add temporal recency bias (more recent = higher weight)
@@ -58,7 +75,12 @@ class TrueEpisodicMemory(nn.Module):
         )  # Large negative for unused
 
         attn_probs = F.softmax(content_scores, dim=-1)
-        retrieved_value = torch.matmul(attn_probs, self.mem_values)
+        # retrieved_value = torch.matmul(attn_probs, self.mem_values)
+        retrieved_value = einsum(
+            attn_probs,
+            self.mem_values,
+            "batch memory_size, memory_size dim -> batch dim",
+        )
         return retrieved_value
 
     def store_episode(self, keys, values, context=None, update_steps=3):
@@ -344,6 +366,11 @@ def test_episodic_sequence_recall(
 
 
 if __name__ == "__main__":
+    # Set random seeds for repeatability
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
     print("=== Testing TrueEpisodicMemory Module ===\n")
 
     print("1. Testing Episodic Temporal Interference...")
