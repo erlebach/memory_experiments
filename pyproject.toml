@@ -19,3 +19,6 @@ dev = [
 [tool.setuptools]
 packages=["memory"]
 package-dir={"" = "."}
+
+[tool.ruff.per-file_ignores]
+"memory/*.py"=["F722"]
