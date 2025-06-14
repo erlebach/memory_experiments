@@ -16,7 +16,14 @@ from torch import Tensor
 class TrueEpisodicMemory(nn.Module):
     """Episodic memory with temporal and contextual binding."""
 
-    def __init__(self, dim, memory_size=100, context_dim=16, lr=0.01):
+    def __init__(
+        self,
+        dim: int,
+        memory_size: int = 100,
+        context_dim: int = 16,
+        lr: float = 0.01,
+        orthogonality_weight: float = 0.01,
+    ) -> None:
         super().__init__()
         # Initialize with small random values to avoid perfect matches
         self.mem_keys = nn.Parameter(torch.randn(memory_size, dim) * 0.1)
@@ -39,6 +46,7 @@ class TrueEpisodicMemory(nn.Module):
         self.used_slots = torch.zeros(memory_size, dtype=torch.bool)
 
         self.optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self.orthogonality_weight = orthogonality_weight
 
     def forward(
         self,
@@ -98,11 +106,12 @@ class TrueEpisodicMemory(nn.Module):
 
     def store_episode(
         self,
-        keys: Float[Tensor, "num_episodes key_dim"],  #  noqa: F722
-        values: Float[Tensor, "num_episodes value_dim"],  # noqa: F722
-        context: Float[Tensor, "num_episodes context_dim"] | None = None,  # noqa: F722
+        keys: Float[Tensor, "num_episodes key_dim"],
+        values: Float[Tensor, "num_episodes value_dim"],
+        context: Float[Tensor, "num_episodes context_dim"] | None = None,
         inner_steps: int = 3,  # Learning rate compensation per episode
         outer_steps: int = 2,  # Spaced repetition rounds
+        timestamps: Float[Tensor, "num_episodes 1"] | None = None,
     ) -> None:
         """Store new episode with learning-based updates."""
         num_episodes = keys.shape[0]
@@ -113,15 +122,19 @@ class TrueEpisodicMemory(nn.Module):
             idx = self.write_pointer % self.memory_size
             episode_slots.append(idx)
             self.used_slots[idx] = True
-            self.mem_timestamps[idx] = self.current_time + i
+            # Use provided timestamp or current_time + i if not provided
+            if timestamps is not None:
+                self.mem_timestamps[idx] = timestamps[i]
+            else:
+                self.mem_timestamps[idx] = self.current_time + i
             self.write_pointer += 1
 
         # TRUE HYBRID: Outer loop (spaced repetition) × Inner loop (learning rate compensation)
         for outer_round in range(outer_steps):  # Spaced repetition rounds
-            print(f"Outer round {outer_round}")
+            # print(f"Outer round {outer_round}")
             for i in range(num_episodes):  # Cycle through all episodes
                 for inner_round in range(inner_steps):  # Multiple updates per episode
-                    print(f"Inner round {inner_round}, episode {i}")
+                    # print(f"Inner round {inner_round}, episode {i}")
                     self.optimizer.zero_grad()
                     ctx = context[i : i + 1] if context is not None else None
                     retrieved = self.forward(keys[i : i + 1], ctx)
@@ -357,6 +370,25 @@ class AdaptiveEpisodicMemory(nn.Module):
                     if loss.item() < thresholds[i].item():
                         episode_converged = True
                         break
+
+                    # Orthogonality regularization for memory VALUES
+                    # Only consider used slots for orthogonality to avoid penalizing empty slots
+                    used_mem_values = self.episodic_memory.mem_values[
+                        self.episodic_memory.used_slots
+                    ]
+                    if used_mem_values.shape[0] > 1:
+                        # Calculate Gram matrix (dot products between used values)
+                        gram_matrix = einsum(
+                            used_mem_values,
+                            used_mem_values,
+                            "n d, m d -> n m",
+                        )
+                        # Penalize deviation from identity matrix (encourages orthogonality and unit norm)
+                        identity_matrix = torch.eye(
+                            used_mem_values.shape[0], device=used_mem_values.device
+                        )
+                        ortho_loss = torch.norm(gram_matrix - identity_matrix) ** 2
+                        loss = loss + self.orthogonality_weight * ortho_loss
 
                     loss.backward()
                     self.episodic_memory.optimizer.step()
