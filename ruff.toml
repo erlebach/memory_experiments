@@ -1,0 +1,28 @@
+select = ["E", "F", "B", "D", "I", "W", "N", "UP", "ANN", "B", "A", "COM", "C4", "DTZ", "PIE", "PT", "Q", "RET", "SIM", "ARG", "PTH", "TD", "FIX", "ERA", "PL", "R", "NPY", "PERF", "FURB", "DOC", "RUF"]
+# select = ["ALL"]
+ignore = [
+	"I001", 
+	"D101", 
+	"D107", 
+	"D105",
+    "T201", # presence of print
+    "G004", # f-strings in logger statements
+    "F722", # forward references
+]
+
+indent-width = 4
+target-version = "py310"
+
+[format]
+# Enable reformatting of code snippets in docstrings.
+docstring-code-format = true
+
+# Prefer double quotes over single quotes
+quote-style = "double"
+
+[lint]
+# Do not track variables starting with '_' as to whether they're used. 
+dummy-variable-rgx = "^_"
+
+[lint.isort]
+force-single-line = false

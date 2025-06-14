@@ -42,10 +42,10 @@ class TrueEpisodicMemory(nn.Module):
 
     def forward(
         self,
-        query: Float[Tensor, "batch query_dim"],  # noqa: F722
-        context: Float[Tensor, "batch context_dim"] | None = None,  # noqa: F722
+        query: Float[Tensor, "batch query_dim"],
+        context: Float[Tensor, "batch context_dim"] | None = None,
         time_weight: float = 0.1,
-    ):
+    ) -> Float[Tensor, "batch dim"]:
         """Retrieve with temporal and contextual cues."""
         # Only consider used memory slots
         if self.used_slots.sum() == 0:
@@ -100,10 +100,10 @@ class TrueEpisodicMemory(nn.Module):
         self,
         keys: Float[Tensor, "num_episodes key_dim"],  #  noqa: F722
         values: Float[Tensor, "num_episodes value_dim"],  # noqa: F722
-        context=None,
-        inner_steps=3,  # Learning rate compensation per episode
-        outer_steps=2,  # Spaced repetition rounds
-    ):
+        context: Float[Tensor, "num_episodes context_dim"] | None = None,  # noqa: F722
+        inner_steps: int = 3,  # Learning rate compensation per episode
+        outer_steps: int = 2,  # Spaced repetition rounds
+    ) -> None:
         """Store new episode with learning-based updates."""
         num_episodes = keys.shape[0]
 
