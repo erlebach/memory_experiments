@@ -118,8 +118,10 @@ class TrueEpisodicMemory(nn.Module):
 
         # TRUE HYBRID: Outer loop (spaced repetition) × Inner loop (learning rate compensation)
         for outer_round in range(outer_steps):  # Spaced repetition rounds
+            print(f"Outer round {outer_round}")
             for i in range(num_episodes):  # Cycle through all episodes
                 for inner_round in range(inner_steps):  # Multiple updates per episode
+                    print(f"Inner round {inner_round}, episode {i}")
                     self.optimizer.zero_grad()
                     ctx = context[i : i + 1] if context is not None else None
                     retrieved = self.forward(keys[i : i + 1], ctx)
@@ -400,16 +402,19 @@ def test_episodic_temporal_interference(
 
     # Phase 1: Store "morning episodes"
     print("Phase 1: Storing morning episodes...")
-    morning_context = torch.randn(5, context_dim)
-    morning_keys = torch.randn(5, dim)
-    morning_values = torch.randn(5, dim)
+    num_episodes = 5  # not the batch size
+    morning_context = torch.randn(num_episodes, context_dim)
+    morning_keys = torch.randn(num_episodes, dim)
+    morning_values = torch.randn(num_episodes, dim)
 
-    memory.store_episode(morning_keys, morning_values, morning_context, inner_steps=3, outer_steps=2)
+    memory.store_episode(
+        morning_keys, morning_values, morning_context, inner_steps=1, outer_steps=1
+    )
 
     # Test immediate recall
     morning_recall_immediate = []
     with torch.no_grad():
-        for i in range(5):
+        for i in range(num_episodes):
             retrieved = memory(morning_keys[i : i + 1], morning_context[i : i + 1])
             similarity = F.cosine_similarity(
                 retrieved, morning_values[i : i + 1]
@@ -421,10 +426,13 @@ def test_episodic_temporal_interference(
 
     # Phase 2: Store interfering afternoon episodes
     print("Phase 2: Storing interfering afternoon episodes...")
-    afternoon_context = torch.randn(15, context_dim)
+    num_interferring_episodes = 15
+    afternoon_context = torch.randn(num_interferring_episodes, context_dim)
     # Make afternoon keys similar to morning keys (interference)
-    afternoon_keys = morning_keys[:3].repeat(5, 1) + 0.2 * torch.randn(15, dim)
-    afternoon_values = torch.randn(15, dim)
+    afternoon_keys = morning_keys[:3].repeat(num_episodes, 1) + 0.2 * torch.randn(
+        num_interferring_episodes, dim
+    )
+    afternoon_values = torch.randn(num_interferring_episodes, dim)
 
     memory.store_episode(
         afternoon_keys,
@@ -438,7 +446,7 @@ def test_episodic_temporal_interference(
     print("Phase 3: Testing morning recall after interference...")
     morning_recall_delayed = []
     with torch.no_grad():
-        for i in range(5):
+        for i in range(num_episodes):
             retrieved = memory(morning_keys[i : i + 1], morning_context[i : i + 1])
             similarity = F.cosine_similarity(
                 retrieved, morning_values[i : i + 1]
@@ -564,7 +572,13 @@ def test_episodic_sequence_recall(
     sequence_values = torch.stack(sequence_values)
 
     print(f"Storing sequence of {sequence_length} episodes...")
-    memory.store_episode(sequence_keys, sequence_values, story_context, inner_steps=3, outer_steps=2)
+    memory.store_episode(
+        sequence_keys,
+        sequence_values,
+        story_context,
+        inner_steps=0,
+        outer_steps=0,
+    )
 
     # Test sequential vs random recall
     print("Testing sequential vs random recall...")
@@ -659,13 +673,14 @@ if __name__ == "__main__":
     print("1. Testing Episodic Temporal Interference...")
     interference_results = test_episodic_temporal_interference()
     print(f"Results: {interference_results}\n")
+    quit()
 
     print("2. Testing Episodic Sequence Recall...")
     sequence_results = test_episodic_sequence_recall()
     print(f"Results: {sequence_results}\n")
 
     print("=== All tests completed successfully! ===")
-
+    quit()
     # --------------------------------------------------------------------------------
     # Create adaptive memory system
     memory = create_adaptive_episodic_memory(dim=32, context_dim=16)
