@@ -55,48 +55,47 @@ class TrueEpisodicMemory(nn.Module):
         time_weight: float = 0.1,
     ) -> Float[Tensor, "batch dim"]:
         """Retrieve with temporal and contextual cues."""
-        # Only consider used memory slots
         if self.used_slots.sum() == 0:
-            # No memories stored yet, return random
             return torch.randn_like(query)
 
-        # Mask for used slots
-        used_mask = self.used_slots.float()
+        print("forward, query.shape", query.shape)
 
-        # Standard content-based attention
-        content_scores = einsum(
-            query,
-            self.mem_keys,
-            # query @ self.mem_keys.T
-            "batch query_dim, memory_size query_dim -> batch memory_size",
+        # Initialize all scores to -1e9 (will become ~0 in softmax)
+        content_scores = torch.full(
+            (query.shape[0], self.memory_size), -1e9, device=query.device
         )
 
-        # Add contextual similarity if context provided
-        if context is not None:
-            context_scores = einsum(
-                context,
-                self.mem_contexts,
-                # context @ self.mem_contexts.T
-                "batch context_dim, memory_size context_dim -> batch memory_size",
+        # Only compute scores for used slots
+        used_mask = self.used_slots
+        if used_mask.sum() > 0:
+            # Content-based attention for used slots only
+            used_content_scores = einsum(
+                query,
+                self.mem_keys[used_mask],
+                "batch query_dim, used_slots query_dim -> batch used_slots",
             )
-            content_scores += +0.5 * context_scores
 
-        # Add temporal recency bias (more recent = higher weight)
-        time_decay = torch.exp(
-            -time_weight * (self.current_time - self.mem_timestamps.squeeze())
-        )
-        content_scores = content_scores + 0.3 * time_decay.unsqueeze(0)
+            # Add contextual similarity if provided
+            # This should be parallelized across all memories
+            if context is not None:
+                used_context_scores = einsum(
+                    context,
+                    self.mem_contexts[used_mask],
+                    "batch context_dim, used_slots context_dim -> batch used_slots",
+                )
+                used_content_scores += 0.5 * used_context_scores
 
-        # Mask unused slots
-        print(f"{content_scores.shape=}, {used_mask.shape=}")
-        print(f"{used_mask=}")
-        content_scores = content_scores * used_mask.unsqueeze(0)
-        content_scores = content_scores + (1 - used_mask.unsqueeze(0)) * (
-            -1e9
-        )  # Large negative for unused
+            # Add temporal recency bias for used slots
+            used_time_decay = torch.exp(
+                -time_weight
+                * (self.current_time - self.mem_timestamps[used_mask].squeeze())
+            )
+            used_content_scores += 0.3 * used_time_decay.unsqueeze(0)
+
+            # Assign computed scores to used positions
+            content_scores[:, used_mask] = used_content_scores
 
         attn_probs = F.softmax(content_scores, dim=-1)
-        # retrieved_value = torch.matmul(attn_probs, self.mem_values)
         retrieved_value = einsum(
             attn_probs,
             self.mem_values,
@@ -131,14 +130,26 @@ class TrueEpisodicMemory(nn.Module):
 
         # TRUE HYBRID: Outer loop (spaced repetition) × Inner loop (learning rate compensation)
         for outer_round in range(outer_steps):  # Spaced repetition rounds
-            # print(f"Outer round {outer_round}")
             for i in range(num_episodes):  # Cycle through all episodes
                 for inner_round in range(inner_steps):  # Multiple updates per episode
-                    # print(f"Inner round {inner_round}, episode {i}")
                     self.optimizer.zero_grad()
                     ctx = context[i : i + 1] if context is not None else None
                     retrieved = self.forward(keys[i : i + 1], ctx)
                     loss = F.mse_loss(retrieved, values[i : i + 1])
+                    # Orthogonality regularization for memory VALUES
+                    # Only consider used slots for orthogonality to avoid penalizing empty slots
+                    used_mem_values = self.mem_values[self.used_slots]
+                    if used_mem_values.shape[0] > 1:
+                        # Calculate Gram matrix (dot products between used values)
+                        gram_matrix = einsum(
+                            used_mem_values, used_mem_values, "n d, m d -> n m"
+                        )
+                        # Penalize deviation from identity matrix (encourages orthogonality and unit norm)
+                        identity_matrix = torch.eye(
+                            used_mem_values.shape[0], device=used_mem_values.device
+                        )
+                        ortho_loss = torch.norm(gram_matrix - identity_matrix) ** 2
+                    loss += self.orthogonality_weight * ortho_loss
                     loss.backward()
                     self.optimizer.step()
 
@@ -208,11 +219,17 @@ class EpisodicContentClassifier(nn.Module):
         return inner_steps, outer_steps, thresholds
 
 
+# --------------------------------------------------------------------------------
 class AdaptiveEpisodicMemory(nn.Module):
     """Episodic memory with adaptive learning based on content type."""
 
     def __init__(
-        self, dim: int, memory_size: int = 100, context_dim: int = 16, lr: float = 0.01
+        self,
+        dim: int,
+        memory_size: int = 100,
+        context_dim: int = 16,
+        lr: float = 0.01,
+        orthogonality_weight: float = 0.01,
     ):
         """Initialize adaptive episodic memory.
 
@@ -221,6 +238,7 @@ class AdaptiveEpisodicMemory(nn.Module):
             memory_size: Number of memory slots
             context_dim: Context vector dimension
             lr: Learning rate
+            orthogonality_weight: Weight for orthogonality regularization
 
         """
         super().__init__()
@@ -237,6 +255,8 @@ class AdaptiveEpisodicMemory(nn.Module):
         self.classifier_optimizer = torch.optim.Adam(
             self.content_classifier.parameters(), lr=lr
         )
+
+        self.orthogonality_weight = orthogonality_weight
 
     def forward(
         self,
@@ -512,13 +532,38 @@ def test_episodic_temporal_interference(
     context_selectivity = abs(morning_sim - afternoon_sim)
     print(f"Context selectivity: {context_selectivity:.3f}")
 
+    # Variables needed for plotting
+    plot_dict = {
+        "avg_morning_immediate": avg_morning_immediate,
+        "avg_morning_delayed": avg_morning_delayed,
+        "morning_sim": morning_sim,
+        "afternoon_sim": afternoon_sim,
+        "morning_recall_immediate": morning_recall_immediate,
+        "morning_recall_delayed": morning_recall_delayed,
+    }
+
+    plot_episodic_interference_results(plot_dict)
+
+    results = {
+        "morning_immediate_recall": avg_morning_immediate,
+        "morning_delayed_recall": avg_morning_delayed,
+        "interference_effect": interference_effect,
+        "context_selectivity": context_selectivity,
+    }
+
+    print("✓ Episodic temporal interference test completed")
+    return results
+
+
+def plot_episodic_interference_results(plot_dict: dict) -> None:
+    """Plot the results of the episodic temporal interference test."""
     # Visualization
     plt.figure(figsize=(12, 4))
 
     # Plot 1: Recall over time
     plt.subplot(1, 3, 1)
     episodes = ["Morning\nImmediate", "Morning\nDelayed"]
-    recalls = [avg_morning_immediate, avg_morning_delayed]
+    recalls = [plot_dict["avg_morning_immediate"], plot_dict["avg_morning_delayed"]]
     bars = plt.bar(episodes, recalls, color=["lightblue", "lightcoral"])
     plt.ylabel("Cosine Similarity")
     plt.title("Temporal Interference Effect")
@@ -534,8 +579,10 @@ def test_episodic_temporal_interference(
     # Plot 2: Individual episode recall
     plt.subplot(1, 3, 2)
     x = range(5)
-    plt.plot(x, morning_recall_immediate, "o-", label="Immediate", color="blue")
-    plt.plot(x, morning_recall_delayed, "s-", label="Delayed", color="red")
+    plt.plot(
+        x, plot_dict["morning_recall_immediate"], "o-", label="Immediate", color="blue"
+    )
+    plt.plot(x, plot_dict["morning_recall_delayed"], "s-", label="Delayed", color="red")
     plt.xlabel("Episode Index")
     plt.ylabel("Cosine Similarity")
     plt.title("Per-Episode Recall")
@@ -545,7 +592,7 @@ def test_episodic_temporal_interference(
     # Plot 3: Context effect
     plt.subplot(1, 3, 3)
     contexts = ["Morning\nContext", "Afternoon\nContext"]
-    similarities = [morning_sim, afternoon_sim]
+    similarities = [plot_dict["morning_sim"], plot_dict["afternoon_sim"]]
     bars = plt.bar(contexts, similarities, color=["gold", "purple"])
     plt.ylabel("Cosine Similarity")
     plt.title("Context-Dependent Retrieval")
@@ -561,23 +608,20 @@ def test_episodic_temporal_interference(
     plt.savefig("episodic_interference_results.png", dpi=150, bbox_inches="tight")
     plt.show()
 
-    results = {
-        "morning_immediate_recall": avg_morning_immediate,
-        "morning_delayed_recall": avg_morning_delayed,
-        "interference_effect": interference_effect,
-        "context_selectivity": context_selectivity,
-    }
 
-    print("✓ Episodic temporal interference test completed")
-    return results
-
-
+# --------------------------------------------------------------------------------
 def test_episodic_sequence_recall(
     dim: int = 32,
     context_dim: int = 16,
     sequence_length: int = 6,
 ) -> dict:
-    """Test sequential episodic recall with visualization."""
+    """Evaluate how well the episodic memory system recalls sequences of related episodes.
+
+    This function tests whether the episodic memory system maintains coherent recall
+    for sequences of related episodes, comparing sequential vs. random-order retrieval
+    performance.
+
+    """
     memory = TrueEpisodicMemory(
         dim=dim, context_dim=context_dim, memory_size=50, lr=0.1
     )
@@ -645,15 +689,46 @@ def test_episodic_sequence_recall(
     print(f"Random recall accuracy: {avg_random:.3f}")
 
     # Visualization
+    plot_dict = {
+        "sequential_accuracies": sequential_accuracies,
+        "random_accuracies": random_accuracies,
+        "avg_sequential": avg_sequential,
+        "avg_random": avg_random,
+        "sequence_length": sequence_length,
+    }
+
+    plot_episodic_sequence_recall_results(plot_dict)
+
+    results = {
+        "sequential_accuracy": avg_sequential,
+        "random_accuracy": avg_random,
+        "sequential_advantage": avg_sequential - avg_random,
+    }
+
+    print("✓ Episodic sequence recall test completed")
+    return results
+
+
+def plot_episodic_sequence_recall_results(plot_dict: dict) -> None:
+    """Plot the results of the episodic sequence recall test."""
     plt.figure(figsize=(10, 4))
 
     # Plot 1: Sequential vs Random
     plt.subplot(1, 2, 1)
-    x = range(sequence_length)
-    plt.plot(x, sequential_accuracies, "o-", label="Sequential Order", color="green")
+    x = range(plot_dict["sequence_length"])
     plt.plot(
         x,
-        [random_accuracies[i] for i in range(sequence_length)],
+        plot_dict["sequential_accuracies"],
+        "o-",
+        label="Sequential Order",
+        color="green",
+    )
+    plt.plot(
+        x,
+        [
+            plot_dict["random_accuracies"][i]
+            for i in range(plot_dict["sequence_length"])
+        ],
         "s-",
         label="Random Order",
         color="orange",
@@ -667,7 +742,7 @@ def test_episodic_sequence_recall(
     # Plot 2: Average comparison
     plt.subplot(1, 2, 2)
     methods = ["Sequential", "Random"]
-    averages = [avg_sequential, avg_random]
+    averages = [plot_dict["avg_sequential"], plot_dict["avg_random"]]
     bars = plt.bar(methods, averages, color=["green", "orange"])
     plt.ylabel("Average Cosine Similarity")
     plt.title("Recall Method Comparison")
@@ -683,15 +758,6 @@ def test_episodic_sequence_recall(
     plt.savefig("episodic_sequence_results.png", dpi=150, bbox_inches="tight")
     plt.show()
 
-    results = {
-        "sequential_accuracy": avg_sequential,
-        "random_accuracy": avg_random,
-        "sequential_advantage": avg_sequential - avg_random,
-    }
-
-    print("✓ Episodic sequence recall test completed")
-    return results
-
 
 # --------------------------------------------------------------------------------
 if __name__ == "__main__":
@@ -705,7 +771,6 @@ if __name__ == "__main__":
     print("1. Testing Episodic Temporal Interference...")
     interference_results = test_episodic_temporal_interference()
     print(f"Results: {interference_results}\n")
-    quit()
 
     print("2. Testing Episodic Sequence Recall...")
     sequence_results = test_episodic_sequence_recall()
