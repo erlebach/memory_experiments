@@ -1,6 +1,8 @@
+"""Experiments to test TrueEpisodicMemory."""
+
+import math
 from typing import Tuple
 
-import einops
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -8,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from beartype import beartype
 from einops import einsum
-from jaxtyping import Float, Integer
+from jaxtyping import Float
 from torch import Tensor
 
 
@@ -58,8 +60,6 @@ class TrueEpisodicMemory(nn.Module):
         if self.used_slots.sum() == 0:
             return torch.randn_like(query)
 
-        print("forward, query.shape", query.shape)
-
         # Initialize all scores to -1e9 (will become ~0 in softmax)
         content_scores = torch.full(
             (query.shape[0], self.memory_size), -1e9, device=query.device
@@ -88,8 +88,10 @@ class TrueEpisodicMemory(nn.Module):
             # Add temporal recency bias for used slots
             used_time_decay = torch.exp(
                 -time_weight
-                * (self.current_time - self.mem_timestamps[used_mask].squeeze())
+                * (self.mem_timestamps[used_mask].squeeze() - self.current_time)
             )
+            # print(f"{used_time_decay=}")
+            used_time_decay = torch.clamp(used_time_decay, min=1e-8, max=1.0)
             used_content_scores += 0.3 * used_time_decay.unsqueeze(0)
 
             # Assign computed scores to used positions
@@ -108,8 +110,8 @@ class TrueEpisodicMemory(nn.Module):
         keys: Float[Tensor, "num_episodes key_dim"],
         values: Float[Tensor, "num_episodes value_dim"],
         context: Float[Tensor, "num_episodes context_dim"] | None = None,
-        inner_steps: int = 3,  # Learning rate compensation per episode
-        outer_steps: int = 2,  # Spaced repetition rounds
+        inner_steps: int = 0,  # Learning rate compensation per episode
+        outer_steps: int = 0,  # Spaced repetition rounds
         timestamps: Float[Tensor, "num_episodes 1"] | None = None,
     ) -> None:
         """Store new episode with learning-based updates."""
@@ -129,9 +131,9 @@ class TrueEpisodicMemory(nn.Module):
             self.write_pointer += 1
 
         # TRUE HYBRID: Outer loop (spaced repetition) × Inner loop (learning rate compensation)
-        for outer_round in range(outer_steps):  # Spaced repetition rounds
+        for _ in range(outer_steps):  # Spaced repetition rounds
             for i in range(num_episodes):  # Cycle through all episodes
-                for inner_round in range(inner_steps):  # Multiple updates per episode
+                for _ in range(inner_steps):  # Multiple updates per episode
                     self.optimizer.zero_grad()
                     ctx = context[i : i + 1] if context is not None else None
                     retrieved = self.forward(keys[i : i + 1], ctx)
@@ -442,342 +444,13 @@ def create_adaptive_episodic_memory(
 
 
 # --------------------------------------------------------------------------------
-def test_episodic_temporal_interference(
-    dim: int = 32, context_dim: int = 16, memory_size: int = 20
-) -> dict:
-    """Test temporal interference in episodic memory with visualization."""
-    memory = TrueEpisodicMemory(
-        dim=dim, context_dim=context_dim, memory_size=memory_size, lr=0.1
-    )
-
-    print("=== Testing Episodic Temporal Interference ===")
-
-    # Phase 1: Store "morning episodes"
-    print("Phase 1: Storing morning episodes...")
-    num_episodes = 5  # not the batch size
-    morning_context = torch.randn(num_episodes, context_dim)
-    morning_keys = torch.randn(num_episodes, dim)
-    morning_values = torch.randn(num_episodes, dim)
-
-    memory.store_episode(
-        morning_keys, morning_values, morning_context, inner_steps=1, outer_steps=1
-    )
-
-    # Test immediate recall
-    morning_recall_immediate = []
-    with torch.no_grad():
-        for i in range(num_episodes):
-            retrieved = memory(morning_keys[i : i + 1], morning_context[i : i + 1])
-            similarity = F.cosine_similarity(
-                retrieved, morning_values[i : i + 1]
-            ).item()
-            morning_recall_immediate.append(similarity)
-
-    avg_morning_immediate = np.mean(morning_recall_immediate)
-    print(f"Morning episodes immediate recall: {avg_morning_immediate:.3f}")
-
-    # Phase 2: Store interfering afternoon episodes
-    print("Phase 2: Storing interfering afternoon episodes...")
-    num_interferring_episodes = 15
-    afternoon_context = torch.randn(num_interferring_episodes, context_dim)
-    # Make afternoon keys similar to morning keys (interference)
-    afternoon_keys = morning_keys[:3].repeat(num_episodes, 1) + 0.2 * torch.randn(
-        num_interferring_episodes, dim
-    )
-    afternoon_values = torch.randn(num_interferring_episodes, dim)
-
-    memory.store_episode(
-        afternoon_keys,
-        afternoon_values,
-        afternoon_context,
-        inner_steps=3,
-        outer_steps=2,
-    )
-
-    # Phase 3: Test delayed recall
-    print("Phase 3: Testing morning recall after interference...")
-    morning_recall_delayed = []
-    with torch.no_grad():
-        for i in range(num_episodes):
-            retrieved = memory(morning_keys[i : i + 1], morning_context[i : i + 1])
-            similarity = F.cosine_similarity(
-                retrieved, morning_values[i : i + 1]
-            ).item()
-            morning_recall_delayed.append(similarity)
-
-    avg_morning_delayed = np.mean(morning_recall_delayed)
-    print(f"Morning episodes delayed recall: {avg_morning_delayed:.3f}")
-
-    interference_effect = avg_morning_immediate - avg_morning_delayed
-    print(f"Temporal interference effect: {interference_effect:.3f}")
-
-    # Phase 4: Context-dependent retrieval
-    print("Phase 4: Testing context-dependent retrieval...")
-    test_key = morning_keys[0:1]
-
-    with torch.no_grad():
-        # Retrieve with morning context
-        morning_retrieved = memory(test_key, morning_context[0:1])
-        morning_sim = F.cosine_similarity(morning_retrieved, morning_values[0:1]).item()
-
-        # Retrieve with afternoon context
-        afternoon_retrieved = memory(test_key, afternoon_context[0:1])
-        afternoon_sim = F.cosine_similarity(
-            afternoon_retrieved, afternoon_values[0:1]
-        ).item()
-
-    print(f"Same key, morning context similarity: {morning_sim:.3f}")
-    print(f"Same key, afternoon context similarity: {afternoon_sim:.3f}")
-
-    context_selectivity = abs(morning_sim - afternoon_sim)
-    print(f"Context selectivity: {context_selectivity:.3f}")
-
-    # Variables needed for plotting
-    plot_dict = {
-        "avg_morning_immediate": avg_morning_immediate,
-        "avg_morning_delayed": avg_morning_delayed,
-        "morning_sim": morning_sim,
-        "afternoon_sim": afternoon_sim,
-        "morning_recall_immediate": morning_recall_immediate,
-        "morning_recall_delayed": morning_recall_delayed,
-    }
-
-    plot_episodic_interference_results(plot_dict)
-
-    results = {
-        "morning_immediate_recall": avg_morning_immediate,
-        "morning_delayed_recall": avg_morning_delayed,
-        "interference_effect": interference_effect,
-        "context_selectivity": context_selectivity,
-    }
-
-    print("✓ Episodic temporal interference test completed")
-    return results
-
-
-def plot_episodic_interference_results(plot_dict: dict) -> None:
-    """Plot the results of the episodic temporal interference test."""
-    # Visualization
-    plt.figure(figsize=(12, 4))
-
-    # Plot 1: Recall over time
-    plt.subplot(1, 3, 1)
-    episodes = ["Morning\nImmediate", "Morning\nDelayed"]
-    recalls = [plot_dict["avg_morning_immediate"], plot_dict["avg_morning_delayed"]]
-    bars = plt.bar(episodes, recalls, color=["lightblue", "lightcoral"])
-    plt.ylabel("Cosine Similarity")
-    plt.title("Temporal Interference Effect")
-    plt.ylim(0, 1)
-    for bar, val in zip(bars, recalls):
-        plt.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.02,
-            f"{val:.3f}",
-            ha="center",
-        )
-
-    # Plot 2: Individual episode recall
-    plt.subplot(1, 3, 2)
-    x = range(5)
-    plt.plot(
-        x, plot_dict["morning_recall_immediate"], "o-", label="Immediate", color="blue"
-    )
-    plt.plot(x, plot_dict["morning_recall_delayed"], "s-", label="Delayed", color="red")
-    plt.xlabel("Episode Index")
-    plt.ylabel("Cosine Similarity")
-    plt.title("Per-Episode Recall")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-
-    # Plot 3: Context effect
-    plt.subplot(1, 3, 3)
-    contexts = ["Morning\nContext", "Afternoon\nContext"]
-    similarities = [plot_dict["morning_sim"], plot_dict["afternoon_sim"]]
-    bars = plt.bar(contexts, similarities, color=["gold", "purple"])
-    plt.ylabel("Cosine Similarity")
-    plt.title("Context-Dependent Retrieval")
-    for bar, val in zip(bars, similarities):
-        plt.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.02,
-            f"{val:.3f}",
-            ha="center",
-        )
-
-    plt.tight_layout()
-    plt.savefig("episodic_interference_results.png", dpi=150, bbox_inches="tight")
-    plt.show()
-
-
-# --------------------------------------------------------------------------------
-def test_episodic_sequence_recall(
-    dim: int = 32,
-    context_dim: int = 16,
-    sequence_length: int = 6,
-) -> dict:
-    """Evaluate how well the episodic memory system recalls sequences of related episodes.
-
-    This function tests whether the episodic memory system maintains coherent recall
-    for sequences of related episodes, comparing sequential vs. random-order retrieval
-    performance.
-
-    """
-    memory = TrueEpisodicMemory(
-        dim=dim, context_dim=context_dim, memory_size=50, lr=0.1
-    )
-
-    print("=== Testing Episodic Sequence Recall ===")
-
-    # Create a coherent sequence
-    story_context = torch.randn(1, context_dim).repeat(sequence_length, 1)
-
-    # Create sequence with gradual drift
-    sequence_keys = []
-    sequence_values = []
-    base_key = torch.randn(dim)
-    base_value = torch.randn(dim)
-
-    for i in range(sequence_length):
-        # Each episode drifts from the base
-        key = base_key + 0.1 * i * torch.randn(dim)
-        value = base_value + 0.1 * i * torch.randn(dim)
-        sequence_keys.append(key)
-        sequence_values.append(value)
-
-    sequence_keys = torch.stack(sequence_keys)
-    sequence_values = torch.stack(sequence_values)
-
-    print(f"Storing sequence of {sequence_length} episodes...")
-    memory.store_episode(
-        sequence_keys,
-        sequence_values,
-        story_context,
-        inner_steps=0,
-        outer_steps=0,
-    )
-
-    # Test sequential vs random recall
-    print("Testing sequential vs random recall...")
-
-    # Sequential recall
-    sequential_accuracies = []
-    with torch.no_grad():
-        for i in range(sequence_length):
-            retrieved = memory(sequence_keys[i : i + 1], story_context[i : i + 1])
-            similarity = F.cosine_similarity(
-                retrieved, sequence_values[i : i + 1]
-            ).item()
-            sequential_accuracies.append(similarity)
-
-    # Random order recall
-    random_indices = torch.randperm(sequence_length)
-    random_accuracies = []
-    with torch.no_grad():
-        for idx in random_indices:
-            retrieved = memory(
-                sequence_keys[idx : idx + 1], story_context[idx : idx + 1]
-            )
-            similarity = F.cosine_similarity(
-                retrieved, sequence_values[idx : idx + 1]
-            ).item()
-            random_accuracies.append(similarity)
-
-    avg_sequential = np.mean(sequential_accuracies)
-    avg_random = np.mean(random_accuracies)
-
-    print(f"Sequential recall accuracy: {avg_sequential:.3f}")
-    print(f"Random recall accuracy: {avg_random:.3f}")
-
-    # Visualization
-    plot_dict = {
-        "sequential_accuracies": sequential_accuracies,
-        "random_accuracies": random_accuracies,
-        "avg_sequential": avg_sequential,
-        "avg_random": avg_random,
-        "sequence_length": sequence_length,
-    }
-
-    plot_episodic_sequence_recall_results(plot_dict)
-
-    results = {
-        "sequential_accuracy": avg_sequential,
-        "random_accuracy": avg_random,
-        "sequential_advantage": avg_sequential - avg_random,
-    }
-
-    print("✓ Episodic sequence recall test completed")
-    return results
-
-
-def plot_episodic_sequence_recall_results(plot_dict: dict) -> None:
-    """Plot the results of the episodic sequence recall test."""
-    plt.figure(figsize=(10, 4))
-
-    # Plot 1: Sequential vs Random
-    plt.subplot(1, 2, 1)
-    x = range(plot_dict["sequence_length"])
-    plt.plot(
-        x,
-        plot_dict["sequential_accuracies"],
-        "o-",
-        label="Sequential Order",
-        color="green",
-    )
-    plt.plot(
-        x,
-        [
-            plot_dict["random_accuracies"][i]
-            for i in range(plot_dict["sequence_length"])
-        ],
-        "s-",
-        label="Random Order",
-        color="orange",
-    )
-    plt.xlabel("Episode Position")
-    plt.ylabel("Cosine Similarity")
-    plt.title("Sequential vs Random Recall")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-
-    # Plot 2: Average comparison
-    plt.subplot(1, 2, 2)
-    methods = ["Sequential", "Random"]
-    averages = [plot_dict["avg_sequential"], plot_dict["avg_random"]]
-    bars = plt.bar(methods, averages, color=["green", "orange"])
-    plt.ylabel("Average Cosine Similarity")
-    plt.title("Recall Method Comparison")
-    for bar, val in zip(bars, averages):
-        plt.text(
-            bar.get_x() + bar.get_width() / 2,
-            bar.get_height() + 0.02,
-            f"{val:.3f}",
-            ha="center",
-        )
-
-    plt.tight_layout()
-    plt.savefig("episodic_sequence_results.png", dpi=150, bbox_inches="tight")
-    plt.show()
-
-
-# --------------------------------------------------------------------------------
 if __name__ == "__main__":
     # Set random seeds for repeatability
-    seed = 42
+    # seed = 42
+    seed = 52
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    print("=== Testing TrueEpisodicMemory Module ===\n")
-
-    print("1. Testing Episodic Temporal Interference...")
-    interference_results = test_episodic_temporal_interference()
-    print(f"Results: {interference_results}\n")
-
-    print("2. Testing Episodic Sequence Recall...")
-    sequence_results = test_episodic_sequence_recall()
-    print(f"Results: {sequence_results}\n")
-
-    print("=== All tests completed successfully! ===")
-    quit()
     # --------------------------------------------------------------------------------
     # Create adaptive memory system
     memory = create_adaptive_episodic_memory(dim=32, context_dim=16)
@@ -804,3 +477,19 @@ if __name__ == "__main__":
 
     # Retrieval works the same
     retrieved = memory(morning_keys[0:1], morning_context[0:1])
+
+    # Test fine-grained timestamps + spaced repetition
+    def test_optimal_parameters():
+        # Fine timestamps
+        timestamps = torch.arange(sequence_length) * 0.1
+
+        # Spaced repetition learning
+        inner_steps = 1
+        outer_steps = 50
+
+        # Test multiple configurations
+        configs = [
+            {"inner": 1, "outer": 50, "time_inc": 0.1},
+            {"inner": 1, "outer": 100, "time_inc": 0.05},
+            {"inner": 2, "outer": 25, "time_inc": 0.1},
+        ]

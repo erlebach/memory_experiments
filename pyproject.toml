@@ -20,7 +20,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages=["memory"]
+packages=["memory", "tcm"]
 package-dir={"" = "."}
 
 [tool.ruff.per-file_ignores]
