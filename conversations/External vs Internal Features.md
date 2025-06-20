@@ -1,3 +1,35 @@
+# Table of Contents
+
+1. [External versus Internal Source Features](#external_versus_internal_source_features)
+- [Item versus Representation in CMR](#item_versus_representation)
+- [What is the word for `stimulus` in the TCM paper?](#stimulus_in_TCM_paper)
+- [Imprecision of word usage in CMR paper](#imprecision_of_word_usage)
+- [Concatenating orthogonal features](#concatenating_orthogonal_features)
+- [Is Orthogonality of Features Necessary in CMR?](#is_orthogonality_necessary)
+- [Effect of Beta in CMR](#effect_of_beta_in_CMR)
+- [Parameter `d`](#parameter_d)
+- [Make \beta proportional to surprisal](#beta_prop_surprisal)
+- [Make \beta proportional to surprise](#beta_prop_surprise)
+- [Compare with Surprise in Titan](#surprise_in_titan)
+- [Relationship with Retnet and Mamba](#retnet_and_mamba)
+- [Previous work on this linkage?](#linkage_published?)
+- [Initial draft of papaer](#draft_paper_layout)
+- [Code Template for the general Update Rule](#code_template_update_rule_call_for_collaborators)
+- [Transformer Architecture, Mix and Match Memory Modules](#proposed_architecture)
+- [Test Tasks and Config YAML file](#test_tasks_and_config_yaml_file)
+- [Markdown table with tasks](#markdown_table_with_tasks)
+- [Latex table with tasks](#latex_table_with_tasks)
+- [Measuring Latency](#measuring_latency)
+- [Metrics and Loss Functions](#metrics_and_loss_functions)
+- [Training and Convergence](#training_and_convergence)
+- [Residual Networks](#residual_networks)
+- [Multiple Task Types](#multiple_task_types)
+- [Non-relevance of Task Weights](#non-relevance_of_task_weights)
+- [YAML interface for NEMO](#yaml_interface_for_nemo)
+- [Start from Pretrained models](#start_from_pretrained)
+- [Pros and Cons of Proposal](#pros_and_cons_of_proposal)
+
+
 # External vs Internal Features
 
 ## Overview
@@ -184,7 +216,7 @@ That makes it clear the **vectors** (not the items themselves) are orthonormal.
 You caught a subtle but important misuse of terminology. Would you like a cleaned-up version of that paragraph rewritten with precision?<br>
 
 <a id="concatenating_orthogonal_features"/>
-[Conctenating orthogonal features](#concatenating_orthogonal_features)
+[Concatenating orthogonal features](#concatenating_orthogonal_features)
 <i>[6/19/2025, 9:56:22 PM]</i> 👉 <b>👤 User</b>: 
 <mark>
 This orthonormality means that if one concatenates two features (item and source features), these cannot be independently orthogonal. <br>
@@ -1303,8 +1335,8 @@ logging:
 
 Would you like a matching **paper-ready table** summarizing these tasks for inclusion in a Methods or Evaluation section?<br>
 
-<a id="table_with_tasks"/>
-[Markdown table with tasks](#table_with_tasks)
+<a id="markdown_table_with_tasks"/>
+[Markdown table with tasks](#markdown_table_with_tasks)
 <i>[6/19/2025, 10:48:59 PM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Yes. <br>
@@ -1334,6 +1366,8 @@ This table emphasizes the **diversity of memory behaviors** each task targets, m
 
 Would you like the LaTeX version of this table as well?<br>
 
+<a id="latex_table_with_tasks"/>
+[Latex table with tasks](#latex_table_with_tasks)
 <i>[6/19/2025, 10:49:12 PM]</i> 👉 <b>👤 User</b>: 
 <mark>Yes.
 </mark><br>
@@ -1372,6 +1406,8 @@ Here's the **LaTeX version** of the evaluation task table, ready to drop into yo
 
 Let me know if you'd like this formatted for a single-column journal template or with adjustments for IEEE, NeurIPS, or ACL styles.<br>
 
+<a id="measuring_latency"/>
+[Measuring Latency](#measuring_latency)
 <i>[6/19/2025, 11:11:50 PM]</i> 👉 <b>👤 User</b>: 
 <mark>
 The CMR paper states: "To anticipate the later results, we report signiﬁcant disruptions to both memorability and latency to recall studied material in a condition where participants shift between two orienting tasks within a list."
@@ -1433,6 +1469,8 @@ In such systems, latency is not physical time, but **computational effort needed
 
 Would you like a formal expression for recall latency under a neuralized CMR-style memory block?<br>
 
+<a id="metrics_and_loss_functions"/>
+[Metrics and Loss Functions](#metrics_and_loss_functions)
 <i>[6/19/2025, 11:16:29 PM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Add a section for the paper that discusses metrics and loss functions.
@@ -1527,6 +1565,8 @@ The weights \(\lambda\) can be tuned per task or learned via meta-gradients.
 
 Would you like a separate subsection discussing **training dynamics and convergence behavior** under gated memory updates?<br>
 
+<a id="training_and_convergence"/>
+[Training and Convergence](#raining_and_convergence)
 <i>[6/20/2025, 7:59:12 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Yes, please. <br>
@@ -1593,6 +1633,8 @@ In Mamba-style state-space blocks with learned \( A(x) \) matrices:
 
 Let me know if you'd like this rewritten in a more formal academic tone for journal submission, or paired with simulated training curves to illustrate the described dynamics.<br>
 
+<a id="residual_networks"/>
+[Residual Networks](#residual_networks)
 <i>[6/20/2025, 8:02:13 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 What about the use of residual networks as another means of mitigating the issue of zero gradient through gates in the early stages of training? <br>
@@ -1668,6 +1710,8 @@ You can add the following bullet to the training stabilization table:
 
 Would you like a compact diagram that shows this residual-augmented memory update architecture visually for inclusion in the paper?<br>
 
+<a id="multiple_task_types"/>
+[Multiple Task Types](#multiple_task_types)
 <i>[6/20/2025, 8:07:06 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 No thanks. Perhaps later. 
@@ -1786,6 +1830,8 @@ None of these works, however, integrate such a wide variety of memory behaviors 
 
 Would you like the dataset specification turned into a downloadable JSON/YAML schema or sample generation script later on?<br>
 
+<a id="non-relevance_of_task_weights"/>
+[Non-relevance of Task Weights](#non-relevance_of_task_weights)
 <i>[6/20/2025, 8:12:46 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Not now, thanks. Regarding the multi-task training loop: for each, you only consider one of the losses at a time. Therefore, the weight assigned to each loss does not seem relevant. <br>
@@ -1921,6 +1967,8 @@ You’ve called out a fundamental principle that simplifies design: **task-speci
 
 Would you like a YAML interface for scheduling task sampling frequencies cleanly?<br>
 
+<a id="yaml_interface_for_nemo"/>
+[YAML interface for NEMO](#yaml_interface_for_nemo)
 <i>[6/20/2025, 8:19:02 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Yes, please provide this YAML interface. I'll implement a NEMO-1 architecture where all parameters are put into YAML files. Perhaps I'll use Hydra to concatenate these files into a single file for use with NEMO. Does that make sense? <br>
@@ -2016,6 +2064,8 @@ Let me know if you'd like:
 - A canonical directory structure (`configs/`, `model/`, `task/`)
 - Or a starter script for loading and validating Hydra configs in your main training loop.<br>
 
+<a id="start_from_pretrained"/>
+[Start from Pretrained models](#start_from_pretrained)
 <i>[6/20/2025, 8:26:22 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Rather than train the model from scratch, I would prefer starting from a pretrained modules (mamba, transformer, Retnet), and add memory modules built using a LORA-based strategy with weights initialized to zero with a schedule on the non-frozen learning rates. Either: 
@@ -2102,6 +2152,8 @@ To test the efficacy of adaptive memory modules that evolve during inference, we
 
 Would you like a schematic showing how the LoRA-enhanced memory blocks fit between pretrained layers and task heads in the model architecture?<br>
 
+<a id="pros_and_cons_of_proposal"/>
+[Pros and Cons of Proposal](#pros_and_cons_of_proposal)
 <i>[6/20/2025, 8:27:23 AM]</i> 👉 <b>👤 User</b>: 
 <mark>
 Discuss the pros and cons of my proposal. And relate it to work already published. <br>
