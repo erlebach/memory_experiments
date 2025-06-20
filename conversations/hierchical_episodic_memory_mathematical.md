@@ -1,0 +1,266 @@
+I'll provide a comprehensive mathematical description of the hierarchical episodic memory architecture and the experiments.
+Read file: hierarchical_spatio_temporal.py
+Now let me examine the experiments in the hierarchical_experiments.py file:
+Read file: hierarchical_experiments.py
+Now I have a complete understanding of the hierarchical episodic memory architecture and all 8 experiments. Let me provide a comprehensive mathematical description.
+
+# Mathematical Description of Hierarchical Episodic Memory
+
+## 1. Architecture Overview
+
+The Hierarchical Spatio-Temporal Memory is a tree-structured episodic memory system where each node represents memories at different levels of abstraction.
+
+### 1.1 Memory Node Definition
+
+Each memory node $n_i^{(l)}$ at level $l$ is defined as:
+
+$$n_i^{(l)} = \{c_i^{(l)}, T_i^{(l)}, S_i^{(l)}, \mathcal{C}_i^{(l)}, \mathcal{P}_i^{(l)}, \xi_i^{(l)}, w_i^{(l)}\}$$
+
+Where:
+- $c_i^{(l)} \in \mathbb{R}^d$ is the memory content vector
+- $T_i^{(l)} = [t_{start}, t_{end}]$ is the temporal extent
+- $S_i^{(l)} = [s_{start}, s_{end}]$ is the spatial extent  
+- $\mathcal{C}_i^{(l)}$ is the set of child nodes
+- $\mathcal{P}_i^{(l)}$ is the parent node (if exists)
+- $\xi_i^{(l)} \in \mathbb{R}^{d_c}$ is optional context information
+- $w_i^{(l)} \in [0,1]$ is the importance weight
+
+### 1.2 Hierarchical Structure
+
+The memory forms a tree $\mathcal{T} = \{N, E\}$ where:
+- $N = \bigcup_{l=0}^{L-1} N^{(l)}$ is the set of all nodes across levels
+- $E$ represents parent-child relationships
+- Level 0 contains atomic memories, higher levels contain composed memories
+
+## 2. Spatio-Temporal Encoding
+
+### 2.1 Position Encoding
+
+For a position $(s, t)$ at hierarchy level $l$, the encoding is:
+
+$$PE^{(l)}(s, t) = E_s^{(l)}(s) + E_t^{(l)}(t)$$
+
+Where spatial encoding is:
+$$E_s^{(l)}(s)[2i] = \sin\left(\frac{s}{10000^{2i/d_s} \cdot 2^l}\right)$$
+$$E_s^{(l)}(s)[2i+1] = \cos\left(\frac{s}{10000^{2i/d_s} \cdot 2^l}\right)$$
+
+And temporal encoding is:
+$$E_t^{(l)}(t)[2j] = \sin\left(\frac{t}{10000^{2j/d_t} \cdot 2^l}\right)$$
+$$E_t^{(l)}(t)[2j+1] = \cos\left(\frac{t}{10000^{2j/d_t} \cdot 2^l}\right)$$
+
+The scale factor $2^l$ ensures that higher levels capture longer-range dependencies.
+
+### 2.2 Level-Specific Encoding Networks
+
+The position encodings are transformed through level-specific networks:
+$$\tilde{E}_s^{(l)} = W_s^{(l)} E_s^{(l)} + b_s^{(l)}$$
+$$\tilde{E}_t^{(l)} = W_t^{(l)} E_t^{(l)} + b_t^{(l)}$$
+
+## 3. Memory Composition
+
+### 3.1 Attention-Based Composition
+
+Given child memories $\{c_1^{(l-1)}, c_2^{(l-1)}, \ldots, c_k^{(l-1)}\}$, the parent memory is composed using multi-head attention:
+
+$$C^{(l-1)} = [c_1^{(l-1)}, c_2^{(l-1)}, \ldots, c_k^{(l-1)}]^T$$
+
+$$\text{Attn}^{(l)}(C^{(l-1)}) = \text{MultiHead}(C^{(l-1)}, C^{(l-1)}, C^{(l-1)})$$
+
+$$\bar{c}^{(l)} = \frac{1}{k}\sum_{i=1}^k \text{Attn}^{(l)}(C^{(l-1)})[i]$$
+
+### 3.2 Hierarchical Composition Network
+
+The attended representation is enhanced with temporal structure:
+
+$$\tilde{c}^{(l)} = f_{\text{comp}}^{(l)}([\bar{c}^{(l)}, PE^{(l)}(\bar{s}, \bar{t})])$$
+
+Where $f_{\text{comp}}^{(l)}$ is a composition network:
+$$f_{\text{comp}}^{(l)}(x) = W_2^{(l)} \sigma(W_1^{(l)} x + b_1^{(l)}) + b_2^{(l)}$$
+
+## 4. Memory Grouping and Hierarchy Construction
+
+### 4.1 Proximity-Based Grouping
+
+Memories are grouped based on spatio-temporal proximity. For level $l$, the grouping windows are:
+- Temporal window: $\Delta t^{(l)} = 2^l$
+- Spatial window: $\Delta s^{(l)} = 2^l$
+
+Two memories $n_i^{(l-1)}$ and $n_j^{(l-1)}$ are grouped if:
+$$|T_i^{(l-1)}[end] - T_j^{(l-1)}[start]| \leq \Delta t^{(l)}$$
+$$|S_i^{(l-1)}[end] - S_j^{(l-1)}[start]| \leq \Delta s^{(l)}$$
+
+### 4.2 Hierarchical Construction Algorithm
+
+```
+Algorithm: BuildHierarchy(atomic_memories)
+1. current_level = atomic_memories
+2. for l = 1 to L-1:
+3.   groups = GroupByProximity(current_level, l)
+4.   next_level = []
+5.   for each group G in groups:
+6.     if |G| > 1:
+7.       parent = ComposeMemories(G, l)
+8.       next_level.append(parent)
+9.     else:
+10.      next_level.extend(G)
+11.  current_level = next_level
+12. return current_level[0]  // root
+```
+
+## 5. Hierarchical Retrieval
+
+### 5.1 Query Processing
+
+For a query $q$ at position $(s_q, t_q)$, level-specific encoded queries are:
+$$q^{(l)} = q + PE^{(l)}(s_q, t_q)$$
+
+### 5.2 Spatio-Temporal Overlap Check
+
+A node $n_i^{(l)}$ overlaps with query position if:
+$$s_q \in [S_i^{(l)}[start], S_i^{(l)}[end]] \text{ AND } t_q \in [T_i^{(l)}[start], T_i^{(l)}[end]]$$
+
+### 5.3 Similarity-Based Retrieval
+
+For overlapping nodes, similarity is computed as:
+$$\text{sim}(q^{(l)}, n_i^{(l)}) = \frac{q^{(l)} \cdot c_i^{(l)}}{||q^{(l)}|| \cdot ||c_i^{(l)}||} \cdot w_i^{(l)}$$
+
+### 5.4 Weighted Composition of Retrieved Content
+
+The final retrieved content is:
+$$r = \sum_{i \in \mathcal{R}} \alpha_i c_i^{(l)}$$
+
+Where $\alpha_i = \frac{\exp(\text{sim}(q^{(l)}, n_i^{(l)}))}{\sum_{j \in \mathcal{R}} \exp(\text{sim}(q^{(l)}, n_j^{(l)}))}$
+
+## 6. Complexity Analysis
+
+- **Storage**: $O(N)$ where $N$ is total number of atomic memories
+- **Hierarchy Construction**: $O(N \log N)$ due to sorting and grouping
+- **Retrieval**: $O(\log N)$ due to tree traversal with spatio-temporal pruning
+- **Memory Capacity**: Scales with tree depth $L$ and branching factor
+
+---
+
+# Experimental Analysis
+
+## Experiments in `hierarchical_spatio_temporal.py` (2 experiments)
+
+### Experiment 1: Hierarchical Memory Structure Test
+**Purpose**: Validate basic hierarchical organization and parent-child relationships
+
+**Method**: 
+- Creates a "walking through park" episode with 15 atomic memories
+- Groups into morning walk (5 memories), pond area (5 memories), playground (5 memories)
+- Tests hierarchy construction and visualization
+
+**Mathematical Validation**:
+- Verifies tree structure: $|\mathcal{C}(\text{root})| = 3$ (three main segments)
+- Confirms temporal ordering: $T_{\text{morning}} < T_{\text{pond}} < T_{\text{playground}}$
+- Validates spatial extents: $S_{\text{morning}} \cap S_{\text{pond}} \cap S_{\text{playground}} = \emptyset$
+
+### Experiment 2: Hierarchical Retrieval Dynamics
+**Purpose**: Test retrieval behavior across different hierarchy levels
+
+**Method**:
+- Creates "learning Einstein's equation" episode with 9 atomic memories
+- Tests 4 different query types at 3 hierarchy levels
+- Measures average similarity scores
+
+**Mathematical Analysis**:
+$$\text{Similarity}^{(l)}(q_k) = \frac{1}{|N_{\text{retrieved}}^{(l)}|} \sum_{n \in N_{\text{retrieved}}^{(l)}} \cos(q_k, c_n^{(l)})$$
+
+## Experiments in `hierarchical_experiments.py` (6 experiments)
+
+### Experiment 3: Multi-Scale Temporal Retrieval
+**Purpose**: Test retrieval at different temporal scales
+
+**Method**:
+- Creates "university day" with 13 memories across 12 hours
+- Tests 4 queries at different temporal scales
+- Measures temporal span and memory count per level
+
+**Metrics**:
+- Temporal span: $\Delta T^{(l)} = \max_{n \in \mathcal{R}^{(l)}} T_n[end] - \min_{n \in \mathcal{R}^{(l)}} T_n[start]$
+- Memory count: $|\mathcal{R}^{(l)}|$
+
+**Expected Result**: Higher levels should retrieve memories with larger temporal spans but fewer individual memories.
+
+### Experiment 4: Hierarchical Generalization
+**Purpose**: Test if higher levels extract abstract patterns across episodes
+
+**Method**:
+- Creates 3 episodes with same abstract structure: Problem → Analysis → Solution → Verification
+- Tests cross-episode consistency for each phase
+- Measures generalization score
+
+**Generalization Score**:
+$$G^{(l)}_{\text{phase}} = 1 - \text{std}(\{\text{sim}^{(l)}_{\text{episode}_i}(\text{phase})\}_{i=1}^3)$$
+
+**Hypothesis**: Higher levels should show better generalization (higher $G^{(l)}$).
+
+### Experiment 5: Temporal Chunking and Segmentation
+**Purpose**: Test automatic discovery of episode boundaries
+
+**Method**:
+- Creates continuous 28-memory sequence with 7 natural segments
+- Analyzes discovered segments vs. ground truth
+- Measures segment size distribution
+
+**Segmentation Quality**:
+$$Q_{\text{seg}} = \frac{|\text{Discovered} \cap \text{GroundTruth}|}{|\text{Discovered} \cup \text{GroundTruth}|}$$
+
+### Experiment 6: Cross-Level Interference
+**Purpose**: Test how interference at different levels affects retrieval
+
+**Method**:
+- Stores original episode with concepts A, B, AB
+- Adds interfering episodes at atomic, component, and episode levels
+- Measures retrieval degradation
+
+**Interference Effect**:
+$$I^{(l)}_{\text{type}} = |\text{sim}_{\text{baseline}}^{(l)} - \text{sim}_{\text{after}}^{(l)}|$$
+
+**Expected**: Different interference types should affect different hierarchy levels differently.
+
+### Experiment 7: Compositional Memory
+**Purpose**: Test ability to compose separate experiences into coherent wholes
+
+**Method**:
+- Stores 3 separate components: Einstein, Equation, Relativity
+- Stores composed episode combining all three
+- Tests retrieval of individual vs. composed concepts
+
+**Composition Score**:
+$$C^{(l)} = \frac{|\text{EpisodeSources}|}{4}$$
+
+Where EpisodeSources counts how many original episodes contribute to retrieval.
+
+**Expected**: Higher levels should show better compositional ability.
+
+### Experiment 8: Memory Consolidation Simulation
+**Purpose**: Simulate memory consolidation where important memories are preserved
+
+**Method**:
+- Creates episode with varying importance weights: $w \in \{0.2, 0.3, 0.5, 0.7, 0.9, 1.0\}$
+- Simulates consolidation at 5 time stages with increasing importance thresholds
+- Measures memory decay and importance concentration
+
+**Consolidation Function**:
+$$\text{Consolidate}(T, \theta) = \{n \in T : w_n \geq \theta\}$$
+
+**Metrics**:
+- Memory decay: $D(t) = \frac{|N(t)|}{|N(0)|}$
+- Importance concentration: $I(t) = \frac{1}{|N(t)|}\sum_{n \in N(t)} w_n$
+- Selective preservation: $P_{\text{key}}(t)$ vs. $P_{\text{detail}}(t)$
+
+**Expected**: Key memories should be preserved better than details over time.
+
+## Summary of Mathematical Properties
+
+1. **Hierarchical Scaling**: Position encodings scale as $2^l$, enabling multi-scale representation
+2. **Logarithmic Retrieval**: $O(\log N)$ complexity due to tree structure and spatio-temporal pruning
+3. **Compositional Abstraction**: Higher levels compose lower-level patterns through attention mechanisms
+4. **Temporal Segmentation**: Natural boundaries emerge from proximity-based grouping
+5. **Interference Patterns**: Different hierarchy levels show different vulnerability to interference
+6. **Consolidation Dynamics**: Importance-based filtering simulates biological memory consolidation
+
+The architecture provides a mathematically principled approach to hierarchical episodic memory with emergent properties that mirror human memory phenomena.
