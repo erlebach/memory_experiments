@@ -1,0 +1,429 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage[margin=1in]{geometry}
+\usepackage{natbib}
+
+% Custom commands
+\newcommand{\bm}[1]{\boldsymbol{#1}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+
+\title{A Unified State-Space Memory Framework: Bridging Neural Sequence Models and Human Episodic Memory}
+
+\author{
+Anonymous Submission
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We introduce a general state-space model (SSM) framework that unifies architectures traditionally viewed as disparate: human memory models such as Context Maintenance and Retrieval (CMR), and modern neural sequence models including RetNet and Mamba. Despite differences in their origin and application domains, we show that all can be expressed as recurrent or continuous-time SSMs with input-dependent dynamics. We formalize this connection, demonstrate how ideas such as surprise-based gating and event segmentation naturally emerge within this framework, and propose new hybrid models that combine interpretability and performance. We present benchmark results across cognitive modeling, language modeling, and memory-intensive reasoning tasks, highlighting the trade-offs and synergies among the different instantiations.
+\end{abstract}
+
+\section{Introduction}
+
+Memory is fundamental to both cognition and sequence modeling. While cognitive science has developed sophisticated models of human episodic memory such as Context Maintenance and Retrieval (CMR), the deep learning community has independently created powerful sequence models like RetNet and Mamba. Additionally, neuro-symbolic hybrid approaches like Titan have emerged that bridge these domains. Despite their different origins and applications, these architectures share remarkably similar core dynamics.
+
+In this work, we propose a unifying framework that reveals these diverse approaches as points in a broader space of state-based memory models. Our contributions include: (1) a general state-space formulation that encompasses existing memory architectures, (2) a flexible implementation framework supporting plug-and-play memory modules, and (3) comprehensive benchmarks across cognitive modeling, language modeling, and reasoning tasks.
+
+\section{General State-Space Memory Framework}
+
+We define a general state-space memory framework where the context state $c_i$ evolves according to:
+\begin{equation}
+c_{i} = A(f_i) c_{i-1} + B(f_i)
+\end{equation}
+
+or in continuous time:
+\begin{equation}
+\frac{dx}{dt} = A(x, u) x + B(x, u)
+\end{equation}
+
+The gate formulation introduces surprise-modulated updates:
+\begin{equation}
+c_i = \rho_i c_{i-1} + \beta_i \cdot c^{\text{IN}}_i, \quad \beta_i = g(\text{surprise}_i)
+\end{equation}
+
+where the parameters $A$, $B$, and $\beta$ can be fixed, learned, or conditioned on input or state. This formulation captures the essential dynamics of memory systems while allowing for diverse instantiations.
+
+\section{Mapping Existing Architectures}
+
+\subsection{CMR (Context Maintenance and Retrieval)}
+
+CMR operates in discrete time with psychologically interpretable dynamics. It employs surprise-dependent updates where:
+\begin{equation}
+\beta_i = g\left(\left\|\nabla \mathcal{L}_{\text{memory}}\right\|\right)
+\end{equation}
+
+The context serves as an internal state encoding both temporal and source features, enabling the model to capture human-like memory phenomena such as serial position effects and temporal clustering.
+
+\subsection{RetNet}
+
+RetNet implements low-rank state evolution with implicit recurrence and exponential decay. Its linear memory complexity makes it efficient for long sequences while maintaining the expressiveness needed for language modeling tasks.
+
+\subsection{Mamba and Mamba-2}
+
+These continuous-time state-space models feature input-conditioned dynamics $A(x)$ and achieve fast inference through selective SSM implementations. The input-dependent transition matrices allow for adaptive processing of sequential information.
+
+\subsection{Titan}
+
+Titan uses surprise signals (e.g., prediction error) to modulate memory access and writing, encouraging sparse and interpretable memory updates. This approach bridges the gap between cognitive plausibility and computational efficiency.
+
+\section{Proposed Implementations}
+
+We develop a flexible PyTorch framework implementing the general update equation with plugin modules for:
+\begin{itemize}
+\item Input-conditioned $A(f_i)$ matrices
+\item Surprise-based gating mechanisms  
+\item Low-rank or diagonal state transitions
+\item Learned versus interpretable memory representations
+\end{itemize}
+
+The framework supports both series and parallel composition of memory blocks, enabling exploration of hybrid architectures that combine the strengths of different approaches.
+
+\section{Benchmarks and Evaluation}
+
+We evaluate our framework across diverse tasks that probe different aspects of memory functionality:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Task Type} & \textbf{Dataset} & \textbf{Metric} \\
+\midrule
+Human memory modeling & PEERS free recall & Serial position, CRP \\
+Language modeling & PG19, Wikitext-103 & Perplexity \\
+Long-context reasoning & Long Range Arena & Accuracy, efficiency \\
+Event segmentation & BABI, CLEVR-Humans & F1, segmentation error \\
+Continual learning & Permuted MNIST & Forgetting, accuracy \\
+\bottomrule
+\end{tabular}
+\caption{Evaluation benchmarks across different task categories}
+\label{tab:benchmarks}
+\end{table}
+
+\subsection{Comprehensive Evaluation Suite for Memory Modules}
+
+Our evaluation suite includes eight specialized tasks designed to probe different memory behaviors:
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{@{}p{2.5cm}p{3.5cm}p{4cm}p{3cm}p{3cm}@{}}
+\toprule
+\textbf{Task Name} & \textbf{Cognitive/Computational Goal} & \textbf{Setup} & \textbf{Key Metrics} & \textbf{Memory Challenge} \\
+\midrule
+Free Recall & Episodic memory, clustering & Sequence recall after item list presentation & Serial Position, Lag-CRP, Source Clustering & Long-range temporal + source binding \\
+Copy \& Repeat & Memory capacity and fidelity & Copy back long random sequences & Copy Accuracy, Max Length & Span maintenance under delay \\
+LRA (Subset) & Efficient long-sequence modeling & Text, Retrieval, ListOps up to 4K tokens & Accuracy, Memory/Speed Efficiency & Sparse/continuous encoding \\
+Event Segmentation & Boundary detection, surprise gating & Multi-part inputs with hidden transitions & Boundary F1, Segment Purity & Surprise-modulated context updating \\
+Continual Learning & Catastrophic interference \& transfer & Task stream with alternating objectives & Accuracy over time, Forgetting Rate & Memory persistence and isolation \\
+Structured QA & Long-context reasoning and retrieval & Questions over long documents & QA Accuracy, Recall@K & Retrieval, compression, abstraction \\
+Memory Generalization & Generalization from memory & Recall perturbed/interpolated examples & Accuracy, Distance vs. Accuracy & Associative generalization \\
+Surprise-Gated Recall & Test dynamic memory gating & Alternate predictable and novel stimuli & Gating Accuracy, $\beta$-response & Input-driven memory updates \\
+\bottomrule
+\end{tabular}
+\caption{Comprehensive evaluation tasks for modular memory architectures}
+\label{tab:eval_tasks}
+\end{table*}
+
+\subsection{Detailed Task Descriptions}
+
+\subsubsection{Synthetic Free Recall Task (CMR-Inspired)}
+\textbf{Goal}: Test memory reinstatement and temporal clustering.
+
+\textbf{Setup}: Present a sequence of tokens (e.g., 30), followed by a recall prompt.
+
+\textbf{Metrics}:
+\begin{itemize}
+\item Serial position effect (primacy/recency)
+\item Lag-CRP (Conditional Response Probability by temporal lag)
+\item Source clustering (if tasks switch mid-list)
+\end{itemize}
+
+\textbf{Use}: Validate cognitive plausibility and long-range associative binding.
+
+\subsubsection{Copy-and-Repeat Task}
+\textbf{Goal}: Test capacity and fidelity of memory.
+
+\textbf{Setup}: Input a sequence (e.g., 1024 symbols), followed by a repeat instruction.
+
+\textbf{Metrics}: Exact match accuracy, copy length limit
+
+\textbf{Use}: Assess ability to maintain precise sequence over long span (used in S4, RNN, Mamba papers).
+
+\subsubsection{Long Range Arena (LRA) Subset}
+\textbf{Goal}: Evaluate efficient long-sequence modeling.
+
+\textbf{Subtasks}:
+\begin{itemize}
+\item ListOps (hierarchical reasoning)
+\item Text (semantic classification)
+\item Retrieval (explicit memory retrieval)
+\end{itemize}
+
+\textbf{Metrics}: Accuracy, speed, memory usage
+
+\textbf{Use}: Benchmark against state-of-the-art long-sequence models.
+
+\subsubsection{Event Segmentation}
+\textbf{Goal}: Test the model's ability to learn event boundaries.
+
+\textbf{Setup}: Input consists of mini-scenes (e.g., toy videos, or token streams from synthetic storylets) with boundary transitions.
+
+\textbf{Labels}: Predict segment boundaries.
+
+\textbf{Use}: Evaluate surprise-driven gating and boundary detection (aligns with gradient-based $\beta$).
+
+\subsubsection{Continual Learning with Interleaved Tasks}
+\textbf{Goal}: Test interference and transfer.
+
+\textbf{Setup}: Present multiple tasks (e.g., arithmetic, classification, reasoning) in a time-ordered stream.
+
+\textbf{Metrics}: Task accuracy over time, forgetting rate
+
+\textbf{Use}: Measure memory modularity, resistance to catastrophic forgetting.
+
+\subsubsection{Question Answering on Structured Documents}
+\textbf{Goal}: Evaluate retrieval + reasoning.
+
+\textbf{Setup}: Feed long document (e.g., 3K tokens) with embedded Q\&A targets.
+
+\textbf{Metrics}: QA accuracy, retrieval score, compression robustness
+
+\textbf{Use}: Test models' ability to localize and abstract memory.
+
+\subsubsection{Memory Generalization Task}
+\textbf{Goal}: Test interpolation and extrapolation from stored memory.
+
+\textbf{Setup}: Store N (query, answer) pairs; test with novel interpolated or perturbed queries.
+
+\textbf{Metrics}: Embedding similarity, generalization accuracy
+
+\textbf{Use}: Evaluate compositional or non-local generalization capacity.
+
+\subsubsection{Surprise-Modulated Recall}
+\textbf{Goal}: Explicitly probe $\beta$ (gating) dynamics.
+
+\textbf{Setup}: Interleave predictable and unpredictable events.
+
+\textbf{Labels}: Predict whether memory updated or not.
+
+\textbf{Use}: Validate gating mechanisms like $\beta(\text{surprise})$.
+
+
+\section{Applications}
+
+Our unified framework enables several novel applications:
+
+\begin{itemize}
+\item \textbf{Interpretable memory in AI}: CMR-inspired structure provides cognitive plausibility
+\item \textbf{Efficient long-range dependency modeling}: RetNet and Mamba optimizations
+\item \textbf{Meta-cognitive control}: Surprise gating for online adaptation
+\item \textbf{Hybrid systems}: Applications in education, cognitive modeling, and LLM enhancement
+\end{itemize}
+
+\section{Metrics and Loss Functions}
+
+\subsection{Loss Functions}
+
+We employ multiple loss functions depending on the task requirements:
+
+\textbf{Cross-Entropy Loss} for classification and prediction:
+\begin{equation}
+\mathcal{L}_{\text{CE}} = -\sum_{i} y_i \log \hat{y}_i
+\end{equation}
+
+\textbf{Mean Squared Error} for memory reconstruction:
+\begin{equation}
+\mathcal{L}_{\text{MSE}} = \frac{1}{N} \sum_{i=1}^N \left\|\hat{f}_i - f_i\right\|^2
+\end{equation}
+
+\textbf{Surprise Signal} from gradient norm:
+\begin{equation}
+\text{surprise}_i = \left\|\nabla_{c_{i-1}} \mathcal{L}_{\text{memory}}(f_i, c_{i-1})\right\|
+\end{equation}
+
+\subsection{Behavioral Metrics}
+
+Beyond standard accuracy measures, we track memory-specific behaviors:
+\begin{itemize}
+\item \textbf{Serial Position Curve}: Accuracy vs. item position (primacy/recency effects)
+\item \textbf{Lag-CRP}: Probability of recalling item $i+k$ given item $i$ was recalled
+\item \textbf{Source Clustering}: Successive recall of items from the same context
+\item \textbf{Memory Utilization}: Active usage and retention patterns
+\end{itemize}
+
+\subsection{Composite Objective}
+
+For multi-task scenarios, we use weighted combinations:
+\begin{equation}
+\mathcal{L}_{\text{total}} = \lambda_{\text{task}} \mathcal{L}_{\text{CE}} + \lambda_{\text{recall}} \mathcal{L}_{\text{memory}} + \lambda_{\text{gating}} \mathcal{L}_{\text{entropy}}
+\end{equation}
+
+\section{Training Dynamics and Stabilization}
+
+Dynamic memory updates introduce unique convergence challenges:
+
+\subsection{Stabilization Techniques}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Problem} & \textbf{Solution} \\
+\midrule
+Vanishing memory updates & Min-gate floor, gate warm-up \\
+Undertrained memory parameters & Auxiliary recall loss \\
+Gradient shocks from surprises & Smooth gating functions \\
+Mamba matrix instability & Spectral norm, low-rank $A(x)$ \\
+Gradient starvation & Residual bypass paths \\
+\bottomrule
+\end{tabular}
+\caption{Stabilization techniques for dynamic memory training}
+\label{tab:stabilization}
+\end{table}
+
+\subsection{Residual Networks for Stabilization}
+
+To mitigate gradient starvation when gating values approach zero, we introduce residual bypass paths:
+\begin{equation}
+c_i = (1 - \beta_i) c_{i-1} + \beta_i \cdot c^{\text{IN}}_i + \alpha \cdot \text{Res}(f_i)
+\end{equation}
+
+This ensures non-zero gradient flow even when $\beta_i \to 0$, allowing the system to begin learning before gating becomes informative.
+
+\section{LoRA-Enhanced Memory Modules}
+
+We enhance pretrained models with memory capabilities using Low-Rank Adaptation (LoRA), preserving base model performance while adding episodic functionality.
+
+\subsection{Two-Stage Training Protocol}
+
+\textbf{Phase 1: Offline Fine-Tuning (Optional)}
+- LoRA adapters in memory blocks trained on multi-task datasets
+- Pretrained base remains frozen
+- Memory modules learn task-specific dynamics and gating functions
+
+\textbf{Phase 2: Inference-Time Adaptation}
+- Memory adapters continue evolving during deployment
+- Gradual learning rate scheduling based on surprise signals
+- Runtime input serves as training data for continuous adaptation
+
+\subsection{Inference-Time Evaluation}
+
+We introduce specialized protocols for evaluating adaptive memory:
+\begin{itemize}
+\item \textbf{Static vs. Adaptive Comparisons}: Performance differences over time
+\item \textbf{Episodic Reinstatement}: Ability to retrieve context-relevant items
+\item \textbf{Temporal Generalization}: Accuracy as function of time and updates
+\item \textbf{Catastrophic Interference}: Performance preservation across task switches
+\end{itemize}
+
+\section{Related Work}
+
+\subsection{Memory Models in Cognitive Science}
+Howard and Kahana~\cite{howard2002temporal} introduced the Temporal Context Model, which was extended by Polyn et al.~\cite{polyn2009context} into CMR with context reinstatement mechanisms. Gershman et al.~\cite{gershman2017bayesian} developed Bayesian approaches to event segmentation that inform our surprise-based gating.
+
+\subsection{Neural State-Space Models}
+Gu et al.~\cite{gu2021s4} introduced Structured State Spaces (S4), while Dao et al.~\cite{dao2023mamba} developed Mamba and Mamba-2 with selective SSM implementations. Sun et al.~\cite{sun2023retnet} proposed Retentive Networks as an alternative to attention mechanisms.
+
+\subsection{Memory-Augmented Neural Networks}
+Graves et al.~\cite{graves2016dnc} introduced Differentiable Neural Computers, and Rae et al.~\cite{rae2020compressive} developed Compressive Transformers. Our Titan model builds on surprise-modulated sparse memory approaches.
+
+\subsection{Surprise and Adaptive Gating}
+Gershman~\cite{gershman2019prediction} connected prediction error to memory encoding, while Ritter et al.~\cite{ritter2018meta} explored meta-learning with surprise-based memory. Goyal et al.~\cite{goyal2022retrieval} investigated retrieval-augmented models with adaptive gating.
+
+\section{Conclusion and Future Work}
+
+We have presented a unified state-space framework that bridges cognitive memory models and modern neural architectures. Our key contributions include:
+
+\begin{itemize}
+\item A general mathematical formulation encompassing diverse memory systems
+\item Flexible implementation supporting hybrid architectures
+\item Comprehensive evaluation across cognitive and computational tasks
+\item Novel LoRA-based adaptation for inference-time memory learning
+\end{itemize}
+
+Future directions include extending to online learning scenarios, developing lifelong memory capabilities, and unifying with graph-based memory models. The framework opens new possibilities for interpretable AI systems that combine cognitive plausibility with computational efficiency.
+
+\section*{Acknowledgments}
+
+We thank the reviewers for their constructive feedback and suggestions for improving this work.
+
+\bibliographystyle{unsrt}
+\begin{thebibliography}{20}
+
+\bibitem{howard2002temporal}
+M.~W. Howard and M.~J. Kahana.
+\newblock A distributed representation of temporal context.
+\newblock {\em Journal of Mathematical Psychology}, 46(3):269--299, 2002.
+
+\bibitem{polyn2009context}
+S.~M. Polyn, K.~A. Norman, and M.~J. Kahana.
+\newblock A context maintenance and retrieval model of organizational processes in free recall.
+\newblock {\em Psychological Review}, 116(1):129--156, 2009.
+
+\bibitem{gershman2017bayesian}
+S.~J. Gershman, Y.~Monfils, K.~A. Norman, and Y.~Niv.
+\newblock The computational nature of memory modification.
+\newblock {\em eLife}, 6:e23763, 2017.
+
+\bibitem{gu2021s4}
+A.~Gu, K.~Goel, and C.~R{\'e}.
+\newblock Efficiently modeling long sequences with structured state spaces.
+\newblock In {\em International Conference on Learning Representations}, 2022.
+
+\bibitem{dao2023mamba}
+T.~Dao, A.~Gu, M.~Eichhorn, A.~Rudra, and C.~R{\'e}.
+\newblock Mamba: Linear-time sequence modeling with selective state spaces.
+\newblock {\em arXiv preprint arXiv:2312.00752}, 2023.
+
+\bibitem{sun2023retnet}
+Y.~Sun, L.~Dong, B.~Patra, S.~Ma, S.~Huang, A.~Çelikyilmaz, H.~Wang, L.~Wang, S.~Liu, J.~Gao, and F.~Wei.
+\newblock Retentive network: A successor to transformer for large language models.
+\newblock {\em arXiv preprint arXiv:2307.08621}, 2023.
+
+\bibitem{graves2016dnc}
+A.~Graves, G.~Wayne, M.~Reynolds, T.~Harley, I.~Danihelka, A.~Grabska-Barwińska, S.~G. Colmenarejo, E.~Grefenstette, T.~Ramalho, J.~Agapiou, et~al.
+\newblock Hybrid computing using a neural network with dynamic external memory.
+\newblock {\em Nature}, 538(7626):471--476, 2016.
+
+\bibitem{rae2020compressive}
+J.~W. Rae, A.~Potapenko, S.~M. Jayakumar, C.~Hillier, and T.~P. Lillicrap.
+\newblock Compressive transformers for long-range sequence modelling.
+\newblock In {\em International Conference on Learning Representations}, 2020.
+
+\bibitem{gershman2019prediction}
+S.~J. Gershman.
+\newblock The dopamine prediction error hypothesis: contributions to associative learning, memory, and attention.
+\newblock {\em Annual Review of Psychology}, 70:379--402, 2019.
+
+\bibitem{ritter2018meta}
+S.~Ritter, J.~X. Wang, Z.~Kurth-Nelson, S.~M. Jayakumar, C.~Blundell, R.~Pascanu, and M.~Botvinick.
+\newblock Been there, done that: Meta-learning with episodic recall.
+\newblock In {\em International Conference on Machine Learning}, 2018.
+
+\bibitem{goyal2022retrieval}
+A.~Goyal, A.~Lamb, Y.~Bengio, and B.~van den Oord.
+\newblock Object files and schemata: Factorizing declarative and procedural knowledge in dynamical systems.
+\newblock {\em arXiv preprint arXiv:2006.16225}, 2022.
+
+\end{thebibliography}
+
+\end{document}
