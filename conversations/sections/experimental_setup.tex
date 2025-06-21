@@ -1,0 +1,158 @@
+\section{Experimental Setup}
+adf
+
+\subsection{Evaluation Suite and Tasks}
+adf
+
+\subsubsection{Synthetic Free Recall Task (CMR-Inspired)}
+\textbf{Goal}: Test memory reinstatement and temporal clustering.
+
+Setup : Present a sequence of tokens (e.g., 30), followed by a recall prompt.
+
+Metrics :
+\begin{itemize}
+\item Serial position effect (primacy/recency)
+\item Lag-CRP (Conditional Response Probability by temporal lag)
+\item Source clustering (if tasks switch mid-list)
+\end{itemize}
+
+Use : Validate cognitive plausibility and long-range associative binding.
+
+\subsubsection{Copy-and-Repeat Task}
+Goal : Test capacity and fidelity of memory.
+
+Setup : Input a sequence (e.g., 1024 symbols), followed by a repeat instruction.
+
+Metrics : Exact match accuracy, copy length limit
+
+Use : Assess ability to maintain precise sequence over long span (used in S4, RNN, Mamba papers).
+
+\subsubsection{Long Range Arena (LRA) Subset}
+Goal : Evaluate efficient long-sequence modeling.
+
+Subtasks :
+\begin{itemize}
+\item ListOps (hierarchical reasoning)
+\item Text (semantic classification)
+\item Retrieval (explicit memory retrieval)
+\end{itemize}
+
+Metrics : Accuracy, speed, memory usage
+
+Use : Benchmark against state-of-the-art long-sequence models.
+
+\subsubsection{Event Segmentation}
+Goal : Test the model’s ability to learn event boundaries.
+
+Setup : Input consists of mini-scenes (e.g., toy videos, or token streams from synthetic storylets) with boundary transitions.
+
+Labels : Predict segment boundaries.
+
+Use : Evaluate surprise-driven gating and boundary detection (aligns with gradient-based $\beta$)
+
+\subsubsection{Continual Learning with Interleaved Tasks}
+Goal : Test interference and transfer.
+
+Setup : Present multiple tasks (e.g., arithmetic, classification, reasoning) in a time-ordered stream.
+
+Metrics : Task accuracy over time, forgetting rate
+
+Use : Measure memory modularity, resistance to catastrophic forgetting.
+
+\subsubsection{Question Answering on Structured Documents}
+Goal : Evaluate retrieval + reasoning.
+
+Setup : Feed long document (e.g., 3K tokens) with embedded Q\&A targets.
+
+Metrics : QA accuracy, retrieval score, compression robustness
+
+Use : Test models’ ability to localize and abstract memory.
+
+\subsubsection{Memory Generalization Task}
+Goal : Test interpolation and extrapolation from stored memory.
+
+Setup : Store N (query, answer) pairs; test with novel interpolated or perturbed querie        s.
+
+Metrics : Embedding similarity, generalization accuracy
+
+Use : Evaluate compositional or non-local generalization capacity.
+
+\subsubsection{Surprise-Modulated Recall}
+Goal : Explicitly probe  $\beta$  (gating) dynamics.
+
+Setup : Interleave predictable and unpredictable events.
+
+Labels : Predict whether memory updated or not.
+
+Use : Validate gating mechanisms like  $\beta(\text{surprise})$.
+
+
+\subsection{Metrics and Objectives}
+adf
+
+%    * *(Moves "Metrics and Loss Functions" here.)*
+\subsubsection{Loss Functions}
+We employ multiple loss functions depending on the task requirements:
+
+\textbf{Cross-Entropy Loss} for classification and prediction:
+\begin{equation}
+\mathcal{L}_{\text{CE}} = -\sum_{i} y_i \log \hat{y}_i
+\end{equation}
+
+\textbf{Mean Squared Error} for memory reconstruction:
+\begin{equation}
+\mathcal{L}_{\text{MSE}} = \frac{1}{N} \sum_{i=1}^N \left\|\hat{f}_i - f_i\right\|^2
+\end{equation}
+
+\textbf{Surprise Signal} from gradient norm:
+\begin{equation}
+\text{surprise}_i = \left\|\nabla_{c_{i-1}} \mathcal{L}_{\text{memory}}(f_i, c_{i-1})\right\|
+\end{equation}
+
+
+\subsubsection{Behavioral Metrics}
+Beyond standard accuracy measures, we track memory-specific behaviors:
+\begin{itemize}
+\item \textbf{Serial Position Curve}: Accuracy vs. item position (primacy/recency effects)
+\item \textbf{Lag-CRP}: Probability of recalling item $i+k$ given item $i$ was recalled
+\item \textbf{Source Clustering}: Successive recall of items from the same context
+\item \textbf{Memory Utilization}: Active usage and retention patterns
+\end{itemize}
+
+
+\subsubsection{Composite Objective}
+For multi-task scenarios, we use weighted combinations:
+\begin{equation}
+\mathcal{L}_{\text{total}} = \lambda_{\text{task}} \mathcal{L}_{\text{CE}} + \lambda_{\text{recall}} \mathcal{L}_{\text{memory}} + \lambda_{\text{gating}} \mathcal{L}_{\text{entropy}}
+\end{equation}
+
+\subsection{Training and Stabilization}
+Dynamic memory updates introduce unique convergence challenges.
+
+% *(Moves "Training Dynamics and Stabilization" here.)*
+\subsubsection{Stabilization Techniques}
+%
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Problem} & \textbf{Solution} \\
+\midrule
+Vanishing memory updates & Min-gate floor, gate warm-up \\
+Undertrained memory parameters & Auxiliary recall loss \\
+Gradient shocks from surprises & Smooth gating functions \\
+Mamba matrix instability & Spectral norm, low-rank $A(x)$ \\
+Gradient starvation & Residual bypass paths \\
+\bottomrule
+\end{tabular}
+\caption{Stabilization techniques for dynamic memory training}
+\label{tab:stabilization}
+\end{table}
+
+\subsubsection{The Role of Residual Connections}
+To mitigate gradient starvation when gating values approach zero, we introduce residual bypass paths:
+\begin{equation}
+c_i = (1 - \beta_i) c_{i-1} + \beta_i \cdot c^{\text{IN}}_i + \alpha \cdot \text{Res}(f_i)
+\end{equation}
+
+This ensures non-zero gradient flow even when $\beta_i \to 0$, allowing the system to begin learni before gating becomes informative.

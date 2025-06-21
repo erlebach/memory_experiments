@@ -1,0 +1,55 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+%\usepackage[margin=1in]{geometry}
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+%\usepackage{showframe}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+% Custom commands
+\newcommand{\bm}[1]{\boldsymbol{#1}}
+\newcommand{\norm}[1]{\left\|#1\right\|}
+
+\title{A Unified State-Space Memory Framework: Bridging Neural Sequence Models and Human Episodic Memory}
+
+\author{
+Gordon Erlebacher
+}
+
+\date{2025-06-21}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We introduce a general state-space model (SSM) framework that unifies architectures traditionally viewed as disparate: human memory models such as Context Maintenance and Retrieval (CMR), and modern neural sequence models including RetNet and Mamba. Despite differences in their origin and application domains, we show that all can be expressed as recurrent or continuous-time SSMs with input-dependent dynamics. We formalize this connection, demonstrate how ideas such as surprise-based gating and event segmentation naturally emerge within this framework, and propose new hybrid models that combine interpretability and performance. We present benchmark results across cognitive modeling, language modeling, and memory-intensive reasoning tasks, highlighting the trade-offs and synergies among the different instantiations.
+\end{abstract}
+
+\input{sections/introduction.tex}
+\input{sections/related_work.tex}
+\input{sections/state_space_framework.tex}
+\input{sections/mapping_architecture.tex}
+\input{sections/proposed_implementations_and_models.tex}
+\input{sections/experimental_setup.tex}                  
+\input{sections/results_and_analysis.tex}
+\input{sections/applications.tex}                        
+\input{sections/discussion.tex}                          
+\input{sections/conclusion_and_future.tex}               
+\input{sections/acknowledgements.tex}                    
+\input{sections/references.tex}
+\input{sections/appendices.tex}                          
+
+\end{document}

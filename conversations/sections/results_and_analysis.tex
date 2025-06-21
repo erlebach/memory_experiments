@@ -1,0 +1,29 @@
+\section{Results and Analysis}
+This section presents the outcomes of evaluating our proposed framework on the benchmarks and tasks defined in the experimental setup. We analyze performance across different memory models, highlighting key trade-offs and synergies.
+
+\subsection{Performance on Benchmark Tasks}
+We evaluate our framework across diverse tasks that probe different aspects of memory functionality. The results on standard benchmarks are summarized in Table~\ref{tab:benchmarks}.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Task Type} & \textbf{Dataset} & \textbf{Metric} \\
+\midrule
+Human memory modeling & PEERS free recall & Serial position, CRP \\
+Language modeling & PG19, Wikitext-103 & Perplexity \\
+Long-context reasoning & Long Range Arena & Accuracy, efficiency \\
+Event segmentation & BABI, CLEVR-Humans & F1, segmentation error \\
+Continual learning & Permuted MNIST & Forgetting, accuracy \\
+\bottomrule
+\end{tabular}
+\caption{Evaluation benchmarks across different task categories.}
+\label{tab:benchmarks}
+\end{table}
+
+\subsection{Analysis of Trade-offs and Synergies}
+Here, we analyze the results to highlight trade-offs (e.g., computational cost vs. cognitive plausibility) and synergies (e.g., how hybrid models outperform their individual components). This subsection will contain figures and analysis comparing CMR, Mamba, RetNet, and hybrid models on the evaluation suite. For example, plots of Lag-CRP curves, Perplexity scores, and LRA accuracy.
+
+\subsection{Ablation Studies}
+To understand the contribution of each component in our framework, we conduct a series of ablation studies. We systematically remove or alter key mechanisms, such as surprise-based gating and LoRA-based adaptation, and measure the impact on performance. This subsection will contain tables showing the results of ablation studies, e.g., model performance with and without surprise gating.
+

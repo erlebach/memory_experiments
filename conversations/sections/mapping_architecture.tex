@@ -1,0 +1,22 @@
+\section{Mapping Existing Architectures to the Framework}
+adf
+
+\subsection{Cognitive Models: Context Maintenance and Retrieval (CMR)}
+CMR operates in discrete time with psychologically interpretable dynamics. It employs surprise-dependent updates where:
+\begin{equation}
+\beta_i = g\left(\left\|\nabla \mathcal{L}_{\text{memory}}\right\|\right)
+\end{equation}
+
+The context serves as an internal state encoding both temporal and source features, enabling the model to capture human-like memory phenomena such as serial position effects and temporal clustering.
+
+
+\subsection{Neural Sequence Models: RetNet}
+RetNet implements low-rank state evolution with implicit recurrence and exponential decay. Its linear memory complexity makes it efficient for long sequences while maintaining the expressiveness needed for language modeling tasks.
+
+\subsection{Structured SSMs: Mamba and Mamba-2}
+These continuous-time state-space models feature input-conditioned dynamics $A(x)$ and achieve fast inference through selective SSM implementations. The input-dependent transition matrices allow for adaptive processing of sequential information.
+
+\subsection{Titan}
+Titan uses surprise signals (e.g., prediction error) to modulate memory access and writing, encouraging sparse and interpretable memory updates. This approach bridges the gap between cognitive plausibility and computational efficiency.
+
+

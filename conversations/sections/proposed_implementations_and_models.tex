@@ -1,0 +1,47 @@
+\section{Proposed Implementations and Hybrid Models}
+We develop a flexible PyTorch framework implementing the general update equation with plugin modules for:
+\begin{itemize}
+\item Input-conditioned $A(f_i)$ matrices
+\item Surprise-based gating mechanisms  
+\item Low-rank or diagonal state transitions
+\item Learned versus interpretable memory representations
+\end{itemize}
+
+The framework supports both series and parallel composition of memory blocks, enabling exploration of hybrid architectures that combine the strengths of different approaches.
+
+
+\subsection{Synergistic Architectures (NEW)} % (Proposed new subsection)**
+adf
+
+\subsection{LoRA-Enhanced Memory Modules}
+We enhance pretrained models with memory capabilities using Low-Rank Adaptation (LoRA), preserving base model performance while adding episodic functionality.
+
+\subsubsection{Two-Stage Training Protocol}
+\textbf{Phase 1: Offline Fine-Tuning (Optional)}
+\begin{itemize}
+\item
+LoRA adapters in memory blocks trained on multi-task datasets
+\item
+Pretrained base remains frozen
+\item
+Memory modules learn task-specific dynamics and gating functions
+\end{itemize}
+
+\textbf{Phase 2: Inference-Time Adaptation}
+\begin{itemize}
+\item
+Memory adapters continue evolving during deployment
+\item
+Gradual learning rate scheduling based on surprise signals
+\item
+Runtime input serves as training data for continuous adaptation
+\end{itemize}
+
+\subsubsection{Inference-Time Adaptation}
+We introduce specialized protocols for evaluating adaptive memory:
+\begin{itemize}
+\item \textbf{Static vs. Adaptive Comparisons}: Performance differences over time
+\item \textbf{Episodic Reinstatement}: Ability to retrieve context-relevant items
+\item \textbf{Temporal Generalization}: Accuracy as function of time and updates
+\item \textbf{Catastrophic Interference}: Performance preservation across task switches
+\end{itemize}

@@ -1,0 +1,90 @@
+\section{Discussion}
+The proposed framework, which enhances pretrained models with LoRA-based
+memory modules, introduces a novel paradigm for creating adaptive and
+efficient AI systems. This section analyzes the advantages and challenges
+of this approach and situates it within the context of existing literature.
+
+\subsection{Advantages of the Proposed Framework}
+
+\subsubsection{Parameter Efficiency and Modularity}
+The use of \textbf{LoRA adapters} allows for the integration of memory
+functionality without the need to update the large pretrained backbone.
+This makes memory modules easy to switch, modify, or upgrade without
+retraining the base model, which is ideal for multi-task and plug-and-play
+deployments.
+
+\subsubsection{Safe and Gradual Integration}
+Initializing LoRA weights to \textbf{zero} ensures that the model's initial
+behavior is identical to that of the base model. This strategy prevents the
+destabilization of pretrained knowledge and allows for a gradual,
+interpretable adaptation process driven entirely by new data.
+
+\subsubsection{Inference-Time Personalization and Adaptation}
+The framework enables the model to become \textbf{situationally adaptive},
+tuning its memory pathways to the current context, user history, or
+conversational domain. This is particularly valuable for applications in
+conversational AI, lifelong learning, and domain adaptation where
+offline retraining is impractical.
+
+\subsubsection{Alignment with Cognitive Models}
+By allowing memory to adapt during inference, the model mirrors key
+\textbf{episodic memory dynamics} observed in human cognition, such as
+context drift, memory reinstatement, and surprise-modulated updating.
+This provides a bridge between high-performance neural models and
+cognitively plausible architectures.
+
+\subsection{Challenges and Considerations}
+
+\subsubsection{Ill-Defined Loss at Inference}
+A primary challenge is the lack of explicit supervision during
+inference-time learning. To overcome this, the model may need to rely on
+self-supervised or contrastive loss functions, or surrogate objectives
+such as consistency, retrieval accuracy, or semantic alignment.
+
+\subsubsection{Risk of Overfitting and Interference}
+Continuous online updates to LoRA adapters risk overfitting to transient
+or noisy inputs, potentially leading to catastrophic forgetting within
+the memory modules. This necessitates mitigation strategies such as
+intelligent gating mechanisms, surprise-aware learning rate schedules,
+and sparsity constraints.
+
+\subsubsection{Evaluation Complexity}
+Evaluating an adaptive system requires more than static accuracy metrics.
+It demands dynamic, lifespan-aware evaluation protocols that can track
+memory quality, interference, and adaptation over time and across
+changing contexts.
+
+\subsubsection{Infrastructural Overhead}
+Online adaptation introduces infrastructural demands, including the need
+for gradient tracking at inference time, persistent state buffers for
+memory traces and LoRA weights, and careful memory management on
+deployment hardware.
+
+\subsection{Relation to Existing Work}
+Our approach synthesizes ideas from several distinct areas of machine
+learning research. Table~\ref{tab:discussion_related_work} situates our
+proposal relative to key existing works. The novel contribution of our
+framework is the integration of these concepts into a unified,
+memory-centric architecture.
+
+\begin{table}[h]
+\centering
+\caption{Connections to Existing Research}
+\label{tab:discussion_related_work}
+\begin{tabular}{p{0.25\textwidth} p{0.35\textwidth} p{0.35\textwidth}}
+\toprule
+\textbf{Related Work} & \textbf{Key Contribution} & \textbf{Relation to Our Proposal} \\
+\midrule
+\textbf{LoRA (Hu et al., 2021)} & Low-rank adaptation for frozen models & We use LoRA specifically for trainable memory adapters. \\
+\textbf{QLoRA (Dettmers et al., 2023)} & Quantized LoRA for memory efficiency & We can apply QLoRA to reduce the cost of memory modules. \\
+\textbf{MetaICL (Kiyono et al., 2022)} & Few-shot inference-time adaptation & We share the goal of online adaptation but focus on explicit memory modules. \\
+\textbf{Memory-Augmented Transformers (e.g., RETRO)} & Augmentation via external, non-trainable memory & Our memory is internal, modular, and dynamically trainable at inference time. \\
+\textbf{Titan (internal)} & Surprise-modulated sparse memory updates & Our surprise-gated \(\beta\) is conceptually aligned with Titan's control mechanism. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This combination of a frozen base, LoRA-injected memory, online gating,
+and episodic dynamics represents a novel hybrid of neuroscience-inspired
+modeling and parameter-efficient transformer tuning that, to our
+knowledge, has not been published as a unified framework.

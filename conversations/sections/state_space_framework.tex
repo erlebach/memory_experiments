@@ -1,0 +1,26 @@
+\section{A General State-Space Framework for Memory}
+adf
+
+% (Proposed new subsection)**
+\subsection{Formalism and Core Components (NEW)} 
+We define a general state-space memory framework where the context state $c_i$ evolves according to:
+\begin{equation}
+c_{i} = A(f_i) c_{i-1} + B(f_i)
+\end{equation}
+
+or in continuous time:
+\begin{equation}
+\frac{dx}{dt} = A(x, u) x + B(x, u)
+\end{equation}
+
+The gate formulation introduces surprise-modulated updates:
+\begin{equation}
+c_i = \rho_i c_{i-1} + \beta_i \cdot c^{\text{IN}}_i, \quad \beta_i = g(\text{surprise}_i)
+\end{equation}
+
+where the parameters $A$, $B$, and $\beta$ can be fixed, learned, or conditioned on input or state. This formulation captures the essential dynamics of memory systems while allowing for diverse instantiations.
+
+% (Proposed new subsection)**
+\subsection{Emergent Properties: Event Segmentation and Surprise (NEW)}
+adf 
+
